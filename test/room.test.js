@@ -192,3 +192,33 @@ test('every question is multiple choice with exactly 4 answers', () => {
     }
   }
 });
+
+test('sabotage: one per round, only on people who have not answered, never yourself', () => {
+  const { room, join, lastFor } = makeRoom();
+  const [a, b, c] = join('A', 'B', 'C');
+  room.configure({ perSet: 3, sets: 2 });
+  room.start();
+  assert.match(room.sabotage(a.id, a.id).error, /someone else/);
+  room.submitGuess(c.id, 0);
+  assert.match(room.sabotage(a.id, c.id).error, /already answered/);
+  assert.deepEqual(room.sabotage(a.id, b.id), {});
+  assert.equal(lastFor('s-B').question.sabotagedBy, 'A');
+  assert.equal(lastFor('s-A').question.sabotagedBy, null);
+  assert.deepEqual(lastFor('host').question.sabotages, [{ from: a.id, to: b.id }]);
+  assert.match(room.sabotage(c.id, b.id).error, /already sabotaged/);
+  assert.match(room.sabotage(a.id, c.id).error, /No sabotages left|already answered/);
+  room.nextQuestion();
+  assert.match(room.sabotage(a.id, b.id).error, /No sabotages left/); // still the same round
+  // Next round (after the act-off) everyone gets one back.
+  room.nextQuestion();
+  room.nextQuestion();
+  assert.equal(room.qIndex % 3, 0);
+  assert.equal(a.sabotages, 1);
+  assert.deepEqual(room.sabotage(a.id, b.id), {});
+});
+
+test('sabotage only works during a question', () => {
+  const { room, join } = makeRoom();
+  const [a, b] = join('A', 'B');
+  assert.match(room.sabotage(a.id, b.id).error, /during a question/);
+});

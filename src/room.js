@@ -7,6 +7,7 @@ const MAX_PLAYERS = 16;
 const CARD_MS = 3000; // title card on the big screen before the animation starts
 const ANSWER_MS = 20000; // time to answer once the animation has played
 const MIN_ACTOFF_PLAYERS = 3; // two actors + at least one voter
+const SABOTAGES_PER_ROUND = 1; // evil smileys each player can send between act-offs
 
 // Phases:
 //   lobby → question → answer → (repeat) → actoff → voting → actoff-result → … → final
@@ -66,6 +67,7 @@ class Room {
       edge: false,
       timesActed: 0,
       actWins: 0,
+      sabotages: SABOTAGES_PER_ROUND,
       socketId,
       connected: true,
     };
@@ -152,7 +154,7 @@ class Room {
     this.playlist.forEach((id) => this.usedQuestions.add(id));
     this.qIndex = -1;
     this.actoff = null;
-    for (const p of this.players.values()) Object.assign(p, { score: 0, correct: 0, edge: false, timesActed: 0, actWins: 0 });
+    for (const p of this.players.values()) Object.assign(p, { score: 0, correct: 0, edge: false, timesActed: 0, actWins: 0, sabotages: SABOTAGES_PER_ROUND });
     this.nextQuestion();
     return {};
   }
@@ -164,6 +166,8 @@ class Room {
   nextQuestion() {
     this.clearTimer();
     this.qIndex += 1;
+    // A fresh round (after an act-off): everyone gets their sabotage back.
+    if (this.qIndex % this.settings.perSet === 0) for (const p of this.players.values()) p.sabotages = SABOTAGES_PER_ROUND;
     const template = BY_ID[this.playlist[this.qIndex]];
     const made = template.create(this.rng);
     // Every question is answered by tapping one of 4 choices.
@@ -179,6 +183,7 @@ class Room {
       ...made,
       prompt: made.prompt || template.prompt,
       removed, // the option crossed out for EDGE holders
+      sabotages: new Map(), // target id -> saboteur id
       edgeHolders: new Set([...this.players.values()].filter((p) => p.edge).map((p) => p.id)),
       guesses: new Map(),
       results: null,
@@ -188,6 +193,23 @@ class Room {
     this.phase = 'question';
     this.broadcast();
     this.timer = this.timers.setTimeout(() => this.revealAnswer(), durationMs);
+  }
+
+  // Send an evil smiley to someone's phone; they have to pop it before they can answer.
+  sabotage(fromId, targetId) {
+    const q = this.question;
+    const from = this.players.get(fromId);
+    const target = this.players.get(targetId);
+    if (this.phase !== 'question' || !from) return { error: 'You can only sabotage during a question.' };
+    if (from.sabotages <= 0) return { error: 'No sabotages left this round.' };
+    if (!target || targetId === fromId) return { error: 'Pick someone else to sabotage.' };
+    if (!target.connected) return { error: `${target.name} isn\u2019t connected right now.` };
+    if (q.guesses.has(targetId)) return { error: `Too late \u2014 ${target.name} already answered!` };
+    if (q.sabotages.has(targetId)) return { error: `${target.name} was already sabotaged this question.` };
+    from.sabotages -= 1;
+    q.sabotages.set(targetId, fromId);
+    this.broadcast();
+    return {};
   }
 
   submitGuess(playerId, value) {
@@ -407,6 +429,7 @@ class Room {
         cardMs: CARD_MS,
         submitted: [...q.guesses.keys()],
         edgeHolders: [...q.edgeHolders],
+        sabotages: [...q.sabotages].map(([to, from]) => ({ from, to })),
       };
       if (this.phase === 'answer') {
         view.question.answer = q.answer;
@@ -431,7 +454,7 @@ class Room {
   // A phone: its own question, and privately whether it was right.
   playerView(player) {
     const view = this.baseView();
-    view.you = { id: player.id, name: player.name, color: player.color, score: player.score, edge: player.edge, correct: player.correct };
+    view.you = { id: player.id, name: player.name, color: player.color, score: player.score, edge: player.edge, correct: player.correct, sabotages: player.sabotages };
     const q = this.question;
     if (q && (this.phase === 'question' || this.phase === 'answer')) {
       const hasEdge = q.edgeHolders.has(player.id);
@@ -441,6 +464,10 @@ class Room {
         removed: hasEdge ? q.removed : null,
         locked: q.guesses.has(player.id),
         guess: q.guesses.has(player.id) ? q.guesses.get(player.id) : null,
+        // Who can still be sabotaged: hasn't answered, hasn't been hit yet this question.
+        answered: [...q.guesses.keys()],
+        sabotaged: [...q.sabotages.keys()],
+        sabotagedBy: q.sabotages.has(player.id) ? (this.players.get(q.sabotages.get(player.id)) || {}).name || 'Someone' : null,
       };
       if (this.phase === 'answer') {
         view.question.answer = q.answer;
@@ -461,4 +488,4 @@ class Room {
   }
 }
 
-module.exports = { Room, MAX_PLAYERS, CARD_MS, ANSWER_MS, MIN_ACTOFF_PLAYERS };
+module.exports = { Room, MAX_PLAYERS, CARD_MS, ANSWER_MS, MIN_ACTOFF_PLAYERS, SABOTAGES_PER_ROUND };

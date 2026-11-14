@@ -181,6 +181,7 @@ export class GameRoom {
     switch (event) {
       case 'player:guess': return room.submitGuess(conn.playerId, payload.value);
       case 'player:vote': return room.submitVote(conn.playerId, payload.actorId);
+      case 'player:sabotage': return room.sabotage(conn.playerId, payload.targetId);
       case 'player:leave': room.kick(conn.playerId); conn.role = null; return {};
       default: return { error: 'Unknown action.' };
     }

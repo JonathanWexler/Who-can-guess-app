@@ -91,7 +91,9 @@ function render() {
     a && [a.actors, a.prompt, a.yourVote, a.result], state.you.edge, state.you.score,
     state.phase === 'lobby' || state.phase === 'final' ? state.players.map((p) => [p.name, p.score]) : null,
     state.leaderId === state.you.id, state.phase === 'lobby' ? state.settings : null,
+    q && q.sabotagedBy, state.you.sabotages,
   ]);
+  syncSabotage();
   if (key === renderedKey) return;
   renderedKey = key;
   const view = { lobby: lobbyView, question: questionView, answer: answerView, actoff: actoffView, voting: votingView, 'actoff-result': actoffResultView, final: finalView }[state.phase];
@@ -128,6 +130,7 @@ function lobbyView() {
         h('li', '\u{1F440} Watch the big screen, then answer here.'),
         h('li', '☝️ Pick one of 4 answers, and no take-backs!'),
         h('li', '\u{1F3AD} You might get picked to act something out!'),
+        h('li', '\u{1F608} Once a round, sabotage someone with an evil smiley that blocks their answers!'),
         h('li', h('strong', { style: { color: 'var(--edge)' } }, '⚡ Win an act-off'), ' to get the EDGE for the next round.'),
       ),
     ),
@@ -167,6 +170,7 @@ function questionView() {
       h('div.card.locked', '\u{1F512} Locked in:', shown),
       h('p.muted', 'No take-backs! Wait for the reveal…'),
       timerBar(),
+      sabotagePanel(),
     );
   }
   const err = h('p.error');
@@ -200,6 +204,7 @@ function questionView() {
     input,
     err,
     timerBar(),
+    sabotagePanel(),
   );
 }
 
@@ -227,6 +232,7 @@ function answerView() {
     h('div.verdict', r.correct ? '✅' : '❌'),
     h('h1', r.correct ? 'You got it!' : r.guess == null ? 'Too slow!' : 'Not quite!'),
     r.correct ? h('div.result-big', '+' + r.points.toLocaleString()) : null,
+    q.sabotagedBy ? h('p', '\u{1F608} ', h('strong', q.sabotagedBy), ' sabotaged you this time!') : null,
     h('div.card.stack', h('div.muted', 'The answer was'), answerShown, h('div', yours)),
     h('p.muted', '\u{1F92B} Only you can see this.'),
   );
@@ -355,4 +361,97 @@ function hostControls() {
       return null;
   }
   return h('div.card.host-controls.stack', { style: state.phase === 'lobby' ? { marginTop: 0, marginBottom: '16px' } : {} }, h('div.round-tag', '\u{1F451} Host controls'), body);
+}
+
+// ---- sabotage ---------------------------------------------------------------
+// Once per round you can send an evil smiley to someone who hasn't answered.
+// It bounces over their answer buttons until they tap it 3 times.
+
+let pickerOpenFor = null;
+
+function sabotagePanel() {
+  const n = state.progress.question;
+  const left = state.you.sabotages;
+  if (left <= 0) return h('p.muted.center', { style: { fontSize: '.85rem', marginTop: '14px' } }, '\u{1F608} Sabotage used — you get another one next round.');
+  const msg = h('p.error', { style: { margin: 0 } });
+  const list = h('div.chips', { style: { justifyContent: 'center' } });
+  const fill = () => {
+    const q = state.question;
+    const targets = state.players.filter((p) => p.id !== state.you.id && p.connected && !q.answered.includes(p.id) && !q.sabotaged.includes(p.id));
+    list.replaceChildren(...(targets.length
+      ? targets.map((p) => h('button.chip', {
+        onclick: async () => {
+          const res = await emit('player:sabotage', { targetId: p.id });
+          if (res.error) { msg.textContent = res.error; fill(); return; }
+          pickerOpenFor = null;
+          toast(`\u{1F608} Sent to ${p.name}!`);
+        },
+      }, swatch(p.color), p.name))
+      : [h('span.muted', 'Nobody left to sabotage on this one!')]));
+  };
+  const wrap = h('div.stack', { class: pickerOpenFor === n ? '' : 'hidden' }, h('p.muted', { style: { margin: 0 } }, 'Who gets the evil smiley?'), list);
+  if (pickerOpenFor === n) fill();
+  const btn = h('button.btn.block.sabotage-btn', {
+    onclick: () => {
+      pickerOpenFor = pickerOpenFor === n ? null : n;
+      if (pickerOpenFor === n) fill();
+      wrap.classList.toggle('hidden', pickerOpenFor !== n);
+    },
+  }, `\u{1F608} Sabotage someone (${left} left)`);
+  return h('div.card.stack.sabotage', btn, wrap, msg);
+}
+
+function toast(text) {
+  const el = h('div.toast', text);
+  document.body.append(el);
+  el.animate([{ opacity: 0, transform: 'translate(-50%, -10px)' }, { opacity: 1, transform: 'translate(-50%, 0)' }], 200);
+  setTimeout(() => el.remove(), 1800);
+}
+
+let sabotageShownFor = null;
+
+// Show the evil smiley once when we get hit; clear it when the question ends.
+function syncSabotage() {
+  const q = state.question;
+  const n = state.progress && state.progress.question;
+  if (state.phase !== 'question' || !q || q.locked) {
+    document.querySelectorAll('.evil-layer').forEach((el) => el.remove());
+    return;
+  }
+  if (q.sabotagedBy && sabotageShownFor !== n) {
+    sabotageShownFor = n;
+    showEvilSmiley(q.sabotagedBy);
+  }
+}
+
+function showEvilSmiley(fromName) {
+  const face = h('div.evil-face', '\u{1F608}');
+  const counter = h('span', '3');
+  const layer = h('div.evil-layer', h('div.evil-banner', h('strong', `${fromName} sabotaged you!`), h('div', 'Tap the evil face ', counter, ' times to get rid of it!')), face);
+  document.body.append(layer);
+  const move = () => {
+    face.style.left = 8 + Math.random() * 62 + '%';
+    face.style.top = 28 + Math.random() * 50 + '%';
+  };
+  move();
+  const wander = setInterval(move, 1100);
+  let hits = 0;
+  const finish = () => {
+    clearInterval(wander);
+    clearTimeout(giveUp);
+    face.textContent = '\u{1F4A5}';
+    face.style.pointerEvents = 'none';
+    setTimeout(() => layer.remove(), 450);
+  };
+  // Never lock anyone out for long.
+  const giveUp = setTimeout(finish, 10000);
+  face.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    hits += 1;
+    counter.textContent = String(3 - hits);
+    face.animate([{ transform: 'translate(-50%,-50%) scale(1.5) rotate(25deg)' }, { transform: 'translate(-50%,-50%) scale(1)' }], 250);
+    if (hits >= 3) finish();
+    else move();
+  });
 }

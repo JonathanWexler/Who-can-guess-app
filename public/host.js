@@ -118,6 +118,7 @@ function lobbyView() {
           h('li', h('strong', 'Picture questions: '), 'watch the big screen — balloons popping, someone blinking, fireworks… then pick one of 4 answers on your phone.'),
           h('li', h('strong', 'One tap only! '), 'No take-backs. Your phone tells you privately if you got it.'),
           h('li', h('strong', '\u{1F3AD} Act-offs: '), `after every ${s.perSet} questions, two random players act something out. Everyone else votes for who did it better.`),
+          h('li', h('strong', '\u{1F608} Sabotage: '), 'once per round, send an evil smiley to someone\u2019s phone. It bounces over their answers until they tap it 3 times!'),
           h('li', h('strong', { style: { color: 'var(--edge)' } }, '⚡ The EDGE: '), 'win an act-off and you get a slight advantage for the next round — one wrong answer gets crossed out on your phone.'),
         ),
         h('p.muted', { style: { marginTop: '12px', fontSize: '.9rem' } }, '1,000 pts per right answer · 1,500 for winning an act-off · 500 for being brave. Scores are revealed after each act-off.'),
@@ -159,14 +160,25 @@ function questionView() {
     ring.classList.toggle('low', left < 5000);
   }, 200);
 
+  const shownSabotage = new Set();
   return {
     el,
     update(s) {
+      for (const sb of s.question.sabotages || []) {
+        const k = sb.from + '>' + sb.to;
+        if (shownSabotage.has(k)) continue;
+        shownSabotage.add(k);
+        const names = Object.fromEntries(s.players.map((p) => [p.id, p.name]));
+        const t = h('div.s-toast', '\u{1F608} ', h('strong', names[sb.from] || '?'), ' sabotaged ', h('strong', names[sb.to] || '?'), '!');
+        stage.append(t);
+        t.animate([{ transform: 'translate(-50%, -150%)', opacity: 0 }, { transform: 'translate(-50%, 0)', opacity: 1, offset: 0.15 }, { transform: 'translate(-50%, 0)', opacity: 1, offset: 0.85 }, { transform: 'translate(-50%, -150%)', opacity: 0 }], 3200).finished.then(() => t.remove());
+      }
+      const hit = new Set((s.question.sabotages || []).map((x) => x.to));
       const sub = new Set(s.question.submitted);
       const connected = s.players.filter((p) => p.connected);
       answered.replaceChildren(
         h('strong', `${sub.size}/${connected.length} answered`),
-        ...s.players.map((p) => h('span.chip', { class: (sub.has(p.id) ? 'done ' : '') + (p.connected ? '' : 'off') }, swatch(p.color), p.name, sub.has(p.id) ? ' ✔' : '')),
+        ...s.players.map((p) => h('span.chip', { class: (sub.has(p.id) ? 'done ' : '') + (p.connected ? '' : 'off') }, swatch(p.color), p.name, hit.has(p.id) ? ' \u{1F608}' : '', sub.has(p.id) ? ' ✔' : '')),
       );
     },
   };
