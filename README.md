@@ -58,7 +58,8 @@ There are also **60 act-off prompts** in `src/actprompts.js`.
 
 ## Running it
 
-**Live:** https://guess.jwexman.workers.dev (open `/host` on the TV and scan the QR code)
+**Live:** https://whocanguess.pages.dev (open `/host` on the TV and scan the QR code)
+Also at https://guess.jwexman.workers.dev — both addresses share the same game and rooms.
 
 It runs on Cloudflare Workers, with one Durable Object per room holding the game state.
 
@@ -66,7 +67,8 @@ It runs on Cloudflare Workers, with one Durable Object per room holding the game
 npm install
 npm start        # local copy at http://localhost:8787 (wrangler dev)
 npm test
-npm run deploy   # publish to Cloudflare (needs a Workers API token)
+npm run deploy        # publish the game Worker ("guess")
+npm run deploy:pages  # publish the whocanguess.pages.dev front (pages/_worker.js)
 ```
 
 To publish under a different name, change `"name"` in `wrangler.jsonc`.
@@ -77,6 +79,7 @@ To publish under a different name, change `"name"` in `wrangler.jsonc`.
 worker/index.js     Cloudflare Worker: pages, room codes, QR codes, GameRoom Durable Object
 public/socket.js    Small WebSocket client used by the TV and phone pages
 scripts/bundle-pages.js  Packs public/ into the Worker at build time
+pages/_worker.js    whocanguess.pages.dev: forwards everything to the "guess" Worker
 src/room.js         Game flow: lobby → question → answer → … → act-off → vote → results → final
 src/questions.js    The 50 questions: each makes a random answer + data for the animation
 src/actprompts.js   Act-off prompts

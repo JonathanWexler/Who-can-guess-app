@@ -7,7 +7,8 @@
     "start": "wrangler dev --ip 0.0.0.0",
     "dev": "wrangler dev --ip 0.0.0.0",
     "deploy": "wrangler deploy",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "deploy:pages": "wrangler pages deploy pages --project-name whocanguess --branch main"
   },
   "license": "MIT",
   "dependencies": {
