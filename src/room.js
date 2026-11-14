@@ -1,4 +1,4 @@
-const { BY_ID, pickQuestions } = require('./questions');
+const { BY_ID, pickQuestions, numberChoices } = require('./questions');
 const { ACT_PROMPTS } = require('./actprompts');
 const { isCorrect, scoreActOff, QUESTION_POINTS } = require('./scoring');
 
@@ -166,9 +166,11 @@ class Room {
     this.qIndex += 1;
     const template = BY_ID[this.playlist[this.qIndex]];
     const made = template.create(this.rng);
+    // Every question is answered by tapping one of 4 choices.
+    if (template.kind === 'number') Object.assign(made, numberChoices(made.answer, this.rng));
     const durationMs = CARD_MS + (made.watchMs || 0) + ANSWER_MS;
     let removed = null;
-    if (template.kind === 'choice') {
+    {
       const wrong = made.options.map((_, i) => i).filter((i) => i !== made.answer);
       removed = wrong[Math.floor(this.rng() * wrong.length)];
     }
@@ -194,7 +196,7 @@ class Room {
     if (q.guesses.has(playerId)) return { error: 'You already locked in an answer.' };
     const n = Number(value);
     if (!Number.isInteger(n) || n < 0 || n > 100000) return { error: 'Answer with a whole number.' };
-    if (q.template.kind === 'choice' && (n >= q.options.length || (n === q.removed && q.edgeHolders.has(playerId)))) {
+    if (n >= q.options.length || (n === q.removed && q.edgeHolders.has(playerId))) {
       return { error: 'Pick one of the options.' };
     }
     q.guesses.set(playerId, n);
@@ -226,7 +228,7 @@ class Room {
     q.results = new Map();
     for (const p of this.players.values()) {
       const guess = q.guesses.has(p.id) ? q.guesses.get(p.id) : null;
-      const correct = isCorrect(q.template.kind === 'choice' ? { kind: 'choice', answer: q.answer } : { kind: 'number', answer: q.answer }, guess, q.edgeHolders.has(p.id));
+      const correct = isCorrect({ kind: 'choice', answer: q.answer }, guess);
       const points = correct ? QUESTION_POINTS : 0;
       p.score += points;
       if (correct) p.correct += 1;
@@ -386,7 +388,7 @@ class Room {
       title: q.template.title,
       emoji: q.template.emoji,
       prompt: q.prompt,
-      kind: q.template.kind,
+      kind: 'choice',
       options: q.options || null,
       endsInMs: Math.max(0, q.endsAt - this.now()),
       durationMs: q.durationMs,

@@ -77,7 +77,7 @@ function progressTag() {
 function edgeLine(ids) {
   const names = state.players.filter((p) => ids.includes(p.id)).map((p) => p.name);
   if (!names.length) return null;
-  return h('div.edge-banner', h('strong', `⚡ ${names.join(' & ')} ${names.length > 1 ? 'have' : 'has'} the EDGE`), ' — off-by-one still counts, and one wrong choice gets crossed out.');
+  return h('div.edge-banner', h('strong', `⚡ ${names.join(' & ')} ${names.length > 1 ? 'have' : 'has'} the EDGE`), ' — one wrong answer is crossed out on their phone.');
 }
 
 // ---------------------------------------------------------------- lobby
@@ -115,10 +115,10 @@ function lobbyView() {
       h('section.card',
         h('h3', 'How to play'),
         h('ol.how',
-          h('li', h('strong', 'Picture questions: '), 'watch the big screen — balloons popping, someone blinking, fireworks… then answer on your phone.'),
-          h('li', h('strong', 'One guess only! '), 'It has to be exactly right. Your phone tells you privately if you got it.'),
+          h('li', h('strong', 'Picture questions: '), 'watch the big screen — balloons popping, someone blinking, fireworks… then pick one of 4 answers on your phone.'),
+          h('li', h('strong', 'One tap only! '), 'No take-backs. Your phone tells you privately if you got it.'),
           h('li', h('strong', '\u{1F3AD} Act-offs: '), `after every ${s.perSet} questions, two random players act something out. Everyone else votes for who did it better.`),
-          h('li', h('strong', { style: { color: 'var(--edge)' } }, '⚡ The EDGE: '), 'win an act-off and you get a slight advantage for the next round — off-by-one counts as right, and one wrong choice gets crossed out.'),
+          h('li', h('strong', { style: { color: 'var(--edge)' } }, '⚡ The EDGE: '), 'win an act-off and you get a slight advantage for the next round — one wrong answer gets crossed out on your phone.'),
         ),
         h('p.muted', { style: { marginTop: '12px', fontSize: '.9rem' } }, '1,000 pts per right answer · 1,500 for winning an act-off · 500 for being brave. Scores are revealed after each act-off.'),
       ),

@@ -126,7 +126,7 @@ function lobbyView() {
       h('h3', 'Quick rules'),
       h('ul.how',
         h('li', '\u{1F440} Watch the big screen, then answer here.'),
-        h('li', '☝️ One guess only, and it has to be exactly right.'),
+        h('li', '☝️ Pick one of 4 answers, and no take-backs!'),
         h('li', '\u{1F3AD} You might get picked to act something out!'),
         h('li', h('strong', { style: { color: 'var(--edge)' } }, '⚡ Win an act-off'), ' to get the EDGE for the next round.'),
       ),
@@ -176,7 +176,9 @@ function questionView() {
   };
   let input;
   if (q.kind === 'choice') {
-    input = h('div.choices', q.options.map((o, i) => {
+    // Number answers (counts, totals) go in a big 2x2 grid; word/picture answers stack.
+    const numeric = q.options.every((o) => !o.emoji && !o.color && /^[\d,]+$/.test(o.label || ''));
+    input = h('div.choices', { class: numeric ? 'grid2' : '' }, q.options.map((o, i) => {
       const crossed = q.removed === i;
       return h('button.choice-btn', {
         class: crossed ? 'crossed' : '',
@@ -193,8 +195,8 @@ function questionView() {
   }
   return h('div.stack',
     questionHeader(q),
-    h('p.watch', '\u{1F440} Watch the big screen! You only get ONE guess.'),
-    q.hasEdge ? h('div.edge-banner', h('strong', '⚡ EDGE: '), q.kind === 'choice' ? 'one wrong answer is crossed out for you.' : 'if you’re off by just 1, it still counts!') : null,
+    h('p.watch', '\u{1F440} Watch the big screen, then tap ONE answer. No take-backs!'),
+    q.hasEdge ? h('div.edge-banner', h('strong', '⚡ EDGE: '), 'one wrong answer is crossed out for you.') : null,
     input,
     err,
     timerBar(),
@@ -221,12 +223,10 @@ function answerView() {
   const r = q.result;
   const answerShown = q.kind === 'choice' ? h('div.option-row', h('span.option-pill.right', optionContent(q.options[q.answer]))) : h('div.answer', formatNum(q.answer));
   const yours = r.guess == null ? 'You didn’t answer in time.' : q.kind === 'choice' ? ['You picked ', h('span.option-pill', { style: { fontSize: '1rem', padding: '4px 10px' } }, optionContent(q.options[r.guess]))] : ['You said ', h('strong', formatNum(r.guess))];
-  const edgeSaved = r.correct && q.kind === 'number' && r.guess !== q.answer;
   return h('div.stack.center.pop',
     h('div.verdict', r.correct ? '✅' : '❌'),
     h('h1', r.correct ? 'You got it!' : r.guess == null ? 'Too slow!' : 'Not quite!'),
     r.correct ? h('div.result-big', '+' + r.points.toLocaleString()) : null,
-    edgeSaved ? h('div.edge-banner', h('strong', '⚡ Your EDGE saved you!'), ' Off by one still counts.') : null,
     h('div.card.stack', h('div.muted', 'The answer was'), answerShown, h('div', yours)),
     h('p.muted', '\u{1F92B} Only you can see this.'),
   );

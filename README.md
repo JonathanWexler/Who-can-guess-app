@@ -2,7 +2,7 @@
 
 A party game for kids (7–15) and grown-ups. A big screen plays quick animated
 **picture questions**: count the balloons before they pop, count the blinks, spot the
-pink snowflakes. Everyone gets **one guess** on their phone. Every few questions, two
+pink snowflakes. Everyone taps **one of 4 answers** on their phone. Every few questions, two
 random players get up for an **act-off**, and everyone else votes for who did it better.
 
 ## How a game goes
@@ -16,8 +16,8 @@ random players get up for an **act-off**, and everyone else votes for who did it
    They also tap **Next**, **Done acting** and **Play again** during the game. If the host's phone
    is gone for 30 seconds, the crown passes to the next player.
 4. **Picture question:** the big screen shows a title card, then the animation. Phones show
-   the question and a number keypad or answer buttons. There's a 20-second answer window
-   after the animation, and you get **one locked-in guess**.
+   the question with **4 answer buttons**. There's a 20-second answer window after the
+   animation, and you get **one tap** (no take-backs).
    - The big screen only shows **who has answered**, never who was right.
    - Each phone privately shows ✅ or ❌ and the correct answer.
 5. **Act-off** (after every 3–4 questions): two random players come up and act out the same
@@ -30,24 +30,26 @@ random players get up for an **act-off**, and everyone else votes for who did it
 
 | | |
 |---|---|
-| Right answer (exact) | 1,000 |
+| Right answer | 1,000 |
 | Win an act-off | 1,500 |
 | Lose an act-off (for being brave) | 500 |
 | Tied act-off | 1,000 each |
 
 ### ⚡ The EDGE
 
-Winning an act-off earns a slight advantage for the **next round of questions**:
-
-- On number questions, being **off by one still counts** as right.
-- On multiple-choice questions, **one wrong answer is crossed out** on your phone.
+Winning an act-off earns a slight advantage for the **next round of questions**: on every
+question, **one wrong answer is crossed out** on your phone, so you pick from 3 instead of 4.
 
 ## The 50 picture questions
 
 All visuals are drawn live with CSS, SVG and emoji. No photos are downloaded, so there's
 nothing to license, it works offline, and every question is randomized each time it's played.
 
-**Counting & tracking (37):** Balloon Pop (they pop while you think!), Blink-Off, Counting
+Every question has **4 answers**. For the counting questions, the 3 wrong answers are close
+calls about 6% apart (57 balloons → 51 / 54 / **57** / 63), and the right answer is equally
+likely to be in any position.
+
+**How many? (37):** Balloon Pop (they pop while you think!), Blink-Off, Counting
 Sheep (goats don't count), Candy Jar, Super Bouncy Ball, Fish Tank, Fireworks Show, Shooting
 Stars, Duck Parade, Popcorn Party, Hoppy Frog, Cookie Monster Munch, Pink Snow, Apple
 Picker, Ladybug Spots, Domino Topple, Choo-Choo Count, Elevator Ride, The Bus Stop, Tally
@@ -55,7 +57,7 @@ Flash, Treasure Chest, Dice Roll, Cup Pyramid, Pop-Up Hamsters, UFO Farm Visit, 
 Lights Out, Tricky Colors, Traffic Light Chaos, Spot the Difference, Balance Scale, Number
 Rain, Dino Pizza Party, Countdown Glitch, Odd One Out, Card Memory, Shape Storm.
 
-**Multiple choice (13):** Shell Game, Photo Finish, Mystery Shadow, Super Zoom, What's
+**Which one? (13):** Shell Game, Photo Finish, Mystery Shadow, Super Zoom, What's
 Missing?, Paint Mixer, Eye Tricks (optical illusions), Quick Clock, What Comes Next?, Who
 Moved?, Emoji Mash-Up, Broken Rainbow, Tower Race.
 
@@ -91,7 +93,7 @@ src/actprompts.js   Act-off prompts
 src/scoring.js      Right/wrong checking, act-off scoring, EDGE rules
 public/host.js      Big-screen UI
 public/scenes.js    The 50 big-screen animations
-public/play.js      Phone UI (keypad, choices, voting)
+public/play.js      Phone UI (answer buttons, voting, host controls)
 test/               node:test tests
 ```
 

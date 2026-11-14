@@ -700,20 +700,21 @@ const SCENES = {
   // ---------------------------------------------------------------- choices
   async shellgame(stage, d, ctx) {
     stage.style.background = 'radial-gradient(circle, #a0522d, #5a2d12)';
-    const X = [25, 50, 75];
+    const X = [20, 40, 60, 80];
+    X.forEach((x, i) => put(stage, String(i + 1), { x, y: 90, size: 9, style: { color: '#ffe7c2', fontWeight: 800 } }));
     const ball = put(stage, '', { x: X[d.start], y: 72, size: 1, cls: 'ball' });
     const cups = X.map((x) => put(stage, '', { x, y: 40, size: 1, cls: 'shell', z: 2 }));
     await ctx.sleep(1600);
     await Promise.all(cups.map((c, i) => anim(c, [{ ...C(X[i], 40) }, { ...C(X[i], 66) }], 500)));
     ball.style.opacity = 0;
     await ctx.sleep(500);
-    const at = [0, 1, 2]; // at[pos] = cup index sitting at screen position pos
+    const at = [0, 1, 2, 3]; // at[pos] = cup index sitting at screen position pos
     for (const [a, b] of d.swaps) {
       const ca = cups[at[a]];
       const cb = cups[at[b]];
       const mid = (X[a] + X[b]) / 2;
-      anim(ca, [{ ...C(X[a], 66) }, { ...C(mid, 56) }, { ...C(X[b], 66) }], { duration: d.speedMs - 40, easing: 'ease-in-out' });
-      anim(cb, [{ ...C(X[b], 66) }, { ...C(mid, 76) }, { ...C(X[a], 66) }], { duration: d.speedMs - 40, easing: 'ease-in-out' });
+      anim(ca, [{ ...C(X[a], 66) }, { ...C(mid, 54) }, { ...C(X[b], 66) }], { duration: d.speedMs - 40, easing: 'ease-in-out' });
+      anim(cb, [{ ...C(X[b], 66) }, { ...C(mid, 78) }, { ...C(X[a], 66) }], { duration: d.speedMs - 40, easing: 'ease-in-out' });
       [at[a], at[b]] = [at[b], at[a]];
       await ctx.sleep(d.speedMs);
     }
@@ -784,35 +785,44 @@ const SCENES = {
   async illusion(stage, d) {
     stage.style.background = '#fff';
     const svg = svgLayer(stage);
-    const big = 1.12;
+    const size = (i) => (d.bigger === i ? 1.12 : 1);
+    const label = (x, y, text) => {
+      const el = svgEl('text', { x, y, 'font-size': 8, 'font-weight': 800, fill: '#5b4bd6', 'text-anchor': 'middle' });
+      el.textContent = text;
+      svg.append(el);
+    };
     if (d.type === 'lines') {
-      const lenTop = 70 * (d.diff > 0 ? big : 1);
-      const lenBot = 70 * (d.diff < 0 ? big : 1);
-      const line = (y, len, outward) => {
-        const x1 = 80 - len / 2;
-        const x2 = 80 + len / 2;
-        const f = 9 * (outward ? -1 : 1);
+      // Arrow-fin trick: fins pointing out make a line look longer, fins pointing in make it look shorter.
+      d.styles.forEach((style, i) => {
+        const y = 18 + i * 27;
+        const len = 64 * size(i);
+        const x1 = 84 - len / 2;
+        const x2 = 84 + len / 2;
         svg.append(svgEl('line', { x1, y1: y, x2, y2: y, stroke: '#222', 'stroke-width': 2.2 }));
-        for (const [x, s] of [[x1, 1], [x2, -1]]) {
-          svg.append(svgEl('line', { x1: x, y1: y, x2: x + s * f, y2: y - 7, stroke: '#222', 'stroke-width': 2.2 }));
-          svg.append(svgEl('line', { x1: x, y1: y, x2: x + s * f, y2: y + 7, stroke: '#222', 'stroke-width': 2.2 }));
+        if (style !== 'plain') {
+          const f = 8 * (style === 'big' ? -1 : 1);
+          for (const [x, s] of [[x1, 1], [x2, -1]]) {
+            svg.append(svgEl('line', { x1: x, y1: y, x2: x + s * f, y2: y - 6, stroke: '#222', 'stroke-width': 2.2 }));
+            svg.append(svgEl('line', { x1: x, y1: y, x2: x + s * f, y2: y + 6, stroke: '#222', 'stroke-width': 2.2 }));
+          }
         }
-      };
-      line(28, lenTop, true);
-      line(64, lenBot, false);
+        label(14, y + 3, 'ABC'[i]);
+      });
     } else {
-      const rl = 9 * (d.diff > 0 ? big : 1);
-      const rr = 9 * (d.diff < 0 ? big : 1);
-      svg.append(svgEl('circle', { cx: 45, cy: 45, r: rl, fill: '#ff8c1a' }));
-      for (let i = 0; i < 6; i++) {
-        const a = (i / 6) * Math.PI * 2;
-        svg.append(svgEl('circle', { cx: 45 + Math.cos(a) * 26, cy: 45 + Math.sin(a) * 26, r: 13, fill: '#8a93a6' }));
-      }
-      svg.append(svgEl('circle', { cx: 118, cy: 45, r: rr, fill: '#ff8c1a' }));
-      for (let i = 0; i < 8; i++) {
-        const a = (i / 8) * Math.PI * 2;
-        svg.append(svgEl('circle', { cx: 118 + Math.cos(a) * 15, cy: 45 + Math.sin(a) * 15, r: 3.6, fill: '#8a93a6' }));
-      }
+      // Ebbinghaus trick: big neighbours make a circle look small, tiny neighbours make it look big.
+      d.styles.forEach((style, i) => {
+        const cx = 27 + i * 53;
+        const cy = 42;
+        svg.append(svgEl('circle', { cx, cy, r: 8 * size(i), fill: '#ff8c1a' }));
+        const ring = style === 'big' ? { n: 6, dist: 18, r: 7.5 } : style === 'small' ? { n: 8, dist: 12, r: 2.6 } : null;
+        if (ring) {
+          for (let k = 0; k < ring.n; k++) {
+            const a = (k / ring.n) * Math.PI * 2;
+            svg.append(svgEl('circle', { cx: cx + Math.cos(a) * ring.dist, cy: cy + Math.sin(a) * ring.dist, r: ring.r, fill: '#8a93a6' }));
+          }
+        }
+        label(cx, 84, 'ABC'[i]);
+      });
     }
   },
 

@@ -304,3 +304,5 @@ button.chip { border: 0; color: inherit; font: inherit; font-weight: 600; cursor
 .vote-btn.sel { background: var(--c); color: #111; }
 
 .host-controls { margin-top: 18px; border: 3px solid var(--accent); text-align: center; }
+.choices.grid2 { grid-template-columns: 1fr 1fr; }
+.choices.grid2 .choice-btn { justify-content: center; font-size: 2.2rem; padding: 22px 8px; }

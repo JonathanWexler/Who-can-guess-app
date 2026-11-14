@@ -419,16 +419,16 @@ const QUESTIONS = [
   // ---------------------------------------------------------------- choices
   {
     id: 'shellgame', title: 'Shell Game', emoji: '\u{1F964}', kind: 'choice',
-    prompt: 'Which cup is the ball under?',
+    prompt: 'Which cup is the ball under? (Cups are numbered 1\u20134 from the left.)',
     create(rng) {
-      const start = int(rng, 0, 2);
-      const swaps = Array.from({ length: int(rng, 6, 10) }, () => sample(rng, [0, 1, 2], 2));
+      const start = int(rng, 0, 3);
+      const swaps = Array.from({ length: int(rng, 6, 10) }, () => sample(rng, [0, 1, 2, 3], 2));
       let pos = start;
       for (const [a, b] of swaps) pos = pos === a ? b : pos === b ? a : pos;
       const speedMs = int(rng, 380, 560);
       return {
         answer: pos,
-        options: [{ label: 'Left', emoji: '⬅️' }, { label: 'Middle', emoji: '⬆️' }, { label: 'Right', emoji: '➡️' }],
+        options: [{ label: 'Cup 1' }, { label: 'Cup 2' }, { label: 'Cup 3' }, { label: 'Cup 4' }],
         data: { start, swaps, speedMs },
         watchMs: 2600 + swaps.length * speedMs + 600,
       };
@@ -496,19 +496,19 @@ const QUESTIONS = [
     },
   },
   {
-    id: 'illusion', title: 'Eye Tricks', emoji: '\u{1F635}‍\u{1F4AB}', kind: 'choice',
+    id: 'illusion', title: 'Eye Tricks', emoji: '\u{1F635}\u200D\u{1F4AB}', kind: 'choice',
     prompt: '',
     create(rng) {
       const type = pick(rng, ['lines', 'circles']);
-      const diff = pick(rng, [0, 0, -1, 1]); // most of the time they're the same!
-      const opts = type === 'lines'
-        ? [{ label: 'Top line is longer', emoji: '⬆️' }, { label: 'Bottom line is longer', emoji: '⬇️' }, { label: 'They’re the same', emoji: '\u{1F7F0}' }]
-        : [{ label: 'Left orange circle is bigger', emoji: '⬅️' }, { label: 'Right orange circle is bigger', emoji: '➡️' }, { label: 'They’re the same', emoji: '\u{1F7F0}' }];
+      // Half the time they're all exactly the same size, which is the trick!
+      const bigger = rng() < 0.5 ? -1 : int(rng, 0, 2);
+      const styles = shuffle(rng, ['big', 'small', 'plain']); // what surrounds each item
+      const noun = type === 'lines' ? 'Line' : 'Circle';
       return {
-        answer: diff === 0 ? 2 : diff > 0 ? 0 : 1,
-        options: opts,
-        prompt: type === 'lines' ? 'Which line is longer?' : 'Which ORANGE circle is bigger?',
-        data: { type, diff },
+        answer: bigger === -1 ? 3 : bigger,
+        options: [{ label: `${noun} A` }, { label: `${noun} B` }, { label: `${noun} C` }, { label: 'They\u2019re all the same', emoji: '\u{1F7F0}' }],
+        prompt: type === 'lines' ? 'Which line is the LONGEST?' : 'Which ORANGE circle is the BIGGEST?',
+        data: { type, bigger, styles },
         watchMs: 0,
       };
     },
@@ -615,6 +615,21 @@ for (const q of QUESTIONS) {
   };
 }
 
+// Turn a number answer into 4 choices: the right one plus 3 close calls,
+// spaced about 6% of the answer apart. Where the right answer sits (lowest,
+// highest, or in between) is random, so "pick the middle one" doesn't work.
+function numberChoices(answer, rng) {
+  const step = Math.max(1, Math.round(answer * 0.06));
+  const roomBelow = Math.floor(answer / step);
+  const below = Math.min(int(rng, 0, 3), roomBelow, 3);
+  const values = [
+    ...sample(rng, [1, 2, 3, 4].filter((k) => k <= roomBelow), below).map((k) => answer - k * step),
+    answer,
+    ...sample(rng, [1, 2, 3, 4], 3 - below).map((k) => answer + k * step),
+  ].sort((a, b) => a - b);
+  return { options: values.map((v) => ({ label: v.toLocaleString('en-US') })), answer: values.indexOf(answer) };
+}
+
 const BY_ID = Object.fromEntries(QUESTIONS.map((q) => [q.id, q]));
 
 // Pick n question ids at random, avoiding ones in `avoid` when possible.
@@ -624,4 +639,4 @@ function pickQuestions(n, rng = Math.random, avoid = new Set()) {
   return [...fresh, ...stale].slice(0, n);
 }
 
-module.exports = { QUESTIONS, BY_ID, COLORS, pickQuestions, shuffle };
+module.exports = { QUESTIONS, BY_ID, COLORS, pickQuestions, shuffle, numberChoices };

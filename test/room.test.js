@@ -34,7 +34,7 @@ test('one guess only; exact answers score; phones see only their own result', ()
   assert.equal(room.phase, 'question');
   const q = room.question;
   const right = q.answer;
-  const wrong = q.template.kind === 'choice' ? (q.answer + 1) % q.options.length : q.answer + 5;
+  const wrong = (q.answer + 1) % q.options.length;
 
   assert.deepEqual(room.submitGuess(a.id, right), {});
   assert.match(room.submitGuess(a.id, wrong).error, /already/);
@@ -172,4 +172,23 @@ test('a host whose phone drops gets 30s to come back before the crown moves', ()
   room.disconnectSocket('s-A2');
   pending.find((x) => x.ms === 30000).fn(); // stays away
   assert.equal(room.leaderId, b.id);
+});
+
+test('every question is multiple choice with exactly 4 answers', () => {
+  const { room, join } = makeRoom();
+  join('A');
+  room.configure({ perSet: 4, sets: 5 });
+  for (let game = 0; game < 3; game++) {
+    room.phase = 'lobby';
+    room.start();
+    for (let i = 0; i < room.playlist.length; i++) {
+      const q = room.question;
+      assert.equal(q.options.length, 4, `${q.template.id} has ${q.options.length} options`);
+      assert.ok(q.answer >= 0 && q.answer < 4);
+      assert.equal(new Set(q.options.map((o) => o.label + (o.emoji || ''))).size, 4, `${q.template.id} duplicate options`);
+      assert.notEqual(q.removed, q.answer);
+      assert.equal(room.playerView([...room.players.values()][0]).question.kind, 'choice');
+      if (i < room.playlist.length - 1) room.nextQuestion();
+    }
+  }
 });

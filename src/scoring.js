@@ -5,8 +5,7 @@
 // the other actor gets ACT_BRAVE_POINTS for getting up there. A tie splits it.
 //
 // The EDGE (earned by winning an act-off, lasts for the next set of questions):
-//   - number questions: a guess that's off by 1 still counts as right
-//   - choice questions: one wrong option is crossed out on your phone
+// one wrong answer is crossed out on your phone, so you pick from 3 instead of 4.
 
 const QUESTION_POINTS = 1000;
 const ACT_WIN_POINTS = 1500;
