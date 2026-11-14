@@ -75,3 +75,16 @@ function startCountdown(el, endsAt, { total } = {}) {
   const id = setInterval(tick, 250);
   tick();
 }
+
+// The act-off prompt: "Act out this ANIMAL: 🦘 A kangaroo with the hiccups".
+function promptBlock(prompt, { small = false } = {}) {
+  if (!prompt) return null;
+  const tag = prompt.kind === 'Animal' ? '\u{1F43E} Act out this ANIMAL' : '\u{1F9B8} Play this CHARACTER';
+  return h('div.act-prompt-block' + (small ? '.small' : ''),
+    h('div.act-kind', tag),
+    h('div.act-emoji', prompt.emoji),
+    h('div.act-prompt', prompt.text),
+  );
+}
+
+const stars = (n) => '⭐'.repeat(n || 0) || '—';

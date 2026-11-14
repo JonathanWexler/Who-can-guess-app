@@ -113,12 +113,51 @@ test('edge holders get a crossed-out option on choice questions and cannot pick 
   assert.match(room.submitGuess(a.id, q.removed).error, /option/);
 });
 
-test('act-offs are skipped with fewer than 3 players; game ends with final', () => {
+test('2-player games still get act-offs: the actors rate each other 1-5 stars', () => {
+  const { room, join, fire, lastFor } = makeRoom();
+  const [a, b] = join('A', 'B');
+  room.configure({ perSet: 3, sets: 2 });
+  room.start();
+  for (let i = 0; i < 3; i++) { room.advance(); room.advance(); }
+  assert.equal(room.phase, 'actoff');
+  assert.deepEqual([...room.actoff.actors].sort(), [a.id, b.id].sort());
+  assert.ok(['Animal', 'Character'].includes(room.actoff.prompt.kind));
+  room.advance(); // done acting
+  assert.equal(room.phase, 'voting');
+  assert.equal(room.actoff.mode, 'rate');
+  assert.equal(lastFor('s-A').actoff.mode, 'rate');
+  assert.match(room.submitRating(a.id, 9).error, /1 to 5/);
+  room.submitRating(a.id, 2); // A gives B 2 stars
+  room.submitRating(b.id, 5); // B gives A 5 stars
+  fire();
+  assert.equal(room.phase, 'actoff-result');
+  assert.deepEqual(room.actoff.result.winners, [a.id]);
+  assert.equal(a.score, 1500);
+  assert.equal(b.score, 500);
+  assert.equal(a.edge, true);
+});
+
+test('host can skip an act-off: no points, no EDGE, on to the next question', () => {
+  const { room, join } = makeRoom();
+  const ps = join('A', 'B', 'C');
+  room.configure({ perSet: 3, sets: 2 });
+  room.start();
+  for (let i = 0; i < 3; i++) { room.advance(); room.advance(); }
+  assert.equal(room.phase, 'actoff');
+  room.skipActOff();
+  assert.equal(room.phase, 'question');
+  assert.equal(room.qIndex, 3);
+  assert.ok(ps.every((p) => p.score === 0 && !p.edge));
+});
+
+test('skipping the last act-off goes to the final screen', () => {
   const { room, join } = makeRoom();
   join('A', 'B');
   room.configure({ perSet: 3, sets: 1 });
   room.start();
   for (let i = 0; i < 3; i++) { room.advance(); room.advance(); }
+  room.advance(); // into voting
+  room.skipActOff();
   assert.equal(room.phase, 'final');
 });
 

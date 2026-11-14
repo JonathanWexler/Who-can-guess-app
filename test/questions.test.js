@@ -81,9 +81,12 @@ test('pickQuestions avoids repeats until it runs out', () => {
   assert.ok(second.every((id) => !first.includes(id)));
 });
 
-test('plenty of act-off prompts', () => {
-  assert.ok(ACT_PROMPTS.length >= 50);
-  assert.equal(new Set(ACT_PROMPTS).size, ACT_PROMPTS.length);
+test('plenty of act-off prompts: animals and characters', () => {
+  assert.ok(ACT_PROMPTS.length >= 60);
+  assert.equal(new Set(ACT_PROMPTS.map((p) => p.text)).size, ACT_PROMPTS.length);
+  assert.ok(ACT_PROMPTS.every((p) => ['Animal', 'Character'].includes(p.kind) && p.emoji && p.text));
+  assert.ok(ACT_PROMPTS.filter((p) => p.kind === 'Animal').length >= 30);
+  assert.ok(ACT_PROMPTS.filter((p) => p.kind === 'Character').length >= 30);
 });
 
 // Higher-quality seeded generator: neighbouring seeds give unrelated sequences.

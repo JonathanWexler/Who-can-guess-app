@@ -162,6 +162,7 @@ export class GameRoom {
         case 'host:next': room.advance(); return {};
         case 'host:reroll-actors': room.rerollActors(); return {};
         case 'host:reroll-prompt': room.rerollPrompt(); return {};
+        case 'host:skip-actoff': room.skipActOff(); return {};
         case 'host:lobby': room.backToLobby(); return {};
         case 'host:kick': room.kick(payload.playerId); return {};
         default: return { error: 'Unknown action.' };
@@ -181,6 +182,7 @@ export class GameRoom {
     switch (event) {
       case 'player:guess': return room.submitGuess(conn.playerId, payload.value);
       case 'player:vote': return room.submitVote(conn.playerId, payload.actorId);
+      case 'player:rate': return room.submitRating(conn.playerId, payload.stars);
       case 'player:sabotage': return room.sabotage(conn.playerId, payload.targetId);
       case 'player:leave': room.kick(conn.playerId); conn.role = null; return {};
       default: return { error: 'Unknown action.' };

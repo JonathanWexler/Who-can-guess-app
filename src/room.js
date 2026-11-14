@@ -1,12 +1,12 @@
 const { BY_ID, pickQuestions, numberChoices } = require('./questions');
 const { ACT_PROMPTS } = require('./actprompts');
-const { isCorrect, scoreActOff, QUESTION_POINTS } = require('./scoring');
+const { isCorrect, scoreActOff, scoreRatings, QUESTION_POINTS } = require('./scoring');
 
 const PLAYER_COLORS = ['#ff5d73', '#ffb347', '#ffe156', '#6be38f', '#5ce1e6', '#7b9cff', '#c38bff', '#ff8ad8', '#b8f05a', '#f0a07a', '#9fe7ff', '#e0e0e0', '#ff9f9f', '#a0ffd8', '#d8b4ff', '#ffd6a0'];
 const MAX_PLAYERS = 16;
 const CARD_MS = 3000; // title card on the big screen before the animation starts
 const ANSWER_MS = 20000; // time to answer once the animation has played
-const MIN_ACTOFF_PLAYERS = 3; // two actors + at least one voter
+const MIN_ACTOFF_PLAYERS = 2; // with exactly 2 players, the actors rate each other
 const SABOTAGES_PER_ROUND = 2; // evil smileys each player can send between act-offs
 
 // Phases:
@@ -86,6 +86,7 @@ class Room {
     if (this.question) this.question.guesses.delete(playerId);
     if (this.actoff) {
       this.actoff.votes.delete(playerId);
+      this.actoff.ratings.delete(playerId);
       if (this.actoff.actors.includes(playerId) && (this.phase === 'actoff' || this.phase === 'voting')) {
         this.phase = 'actoff';
         this.pickActors();
@@ -235,8 +236,14 @@ class Room {
       this.timer = this.timers.setTimeout(() => this.revealAnswer(), 1200);
     }
     if (this.phase === 'voting') {
-      const voters = active.filter((p) => !this.actoff.actors.includes(p.id));
-      if (voters.length && voters.every((p) => this.actoff.votes.has(p.id))) {
+      const a = this.actoff;
+      const done = a.mode === 'rate'
+        ? active.filter((p) => a.actors.includes(p.id)).every((p) => a.ratings.has(p.id))
+        : (() => {
+          const voters = active.filter((p) => !a.actors.includes(p.id));
+          return voters.length && voters.every((p) => a.votes.has(p.id));
+        })();
+      if (done) {
         this.clearTimer();
         this.timer = this.timers.setTimeout(() => this.finishActOff(), 1200);
       }
@@ -280,7 +287,7 @@ class Room {
 
   startActOff() {
     this.clearTimer();
-    this.actoff = { actors: [], prompt: null, votes: new Map(), result: null, number: this.setNumber() };
+    this.actoff = { actors: [], prompt: null, mode: 'vote', votes: new Map(), ratings: new Map(), result: null, number: this.setNumber() };
     this.pickActors();
     this.pickPrompt();
     this.phase = 'actoff';
@@ -295,13 +302,14 @@ class Room {
     const shuffled = pool.map((p) => ({ p, r: this.rng() })).sort((a, b) => a.p.timesActed - b.p.timesActed || a.r - b.r);
     this.actoff.actors = shuffled.slice(0, 2).map((x) => x.p.id);
     this.actoff.votes.clear();
+    this.actoff.ratings.clear();
   }
 
   pickPrompt() {
     if (this.usedPrompts.size >= ACT_PROMPTS.length) this.usedPrompts.clear();
-    const fresh = ACT_PROMPTS.filter((p) => !this.usedPrompts.has(p));
+    const fresh = ACT_PROMPTS.filter((p) => !this.usedPrompts.has(p.text));
     this.actoff.prompt = fresh[Math.floor(this.rng() * fresh.length)];
-    this.usedPrompts.add(this.actoff.prompt);
+    this.usedPrompts.add(this.actoff.prompt.text);
   }
 
   rerollActors() {
@@ -316,9 +324,23 @@ class Room {
     this.broadcast();
   }
 
+  // Host skips this act-off: no points, no EDGE, straight on to the next question.
+  skipActOff() {
+    if (this.phase !== 'actoff' && this.phase !== 'voting') return;
+    this.clearTimer();
+    for (const p of this.players.values()) p.edge = false;
+    this.actoff = null;
+    if (this.qIndex + 1 >= this.playlist.length) return this.finish();
+    return this.nextQuestion();
+  }
+
   openVoting() {
     this.phase = 'voting';
-    this.actoff.votes.clear();
+    // With nobody else to judge (2-player game), the actors rate each other instead.
+    const a = this.actoff;
+    a.mode = this.connectedPlayers().some((p) => !a.actors.includes(p.id)) ? 'vote' : 'rate';
+    a.votes.clear();
+    a.ratings.clear();
     this.broadcast();
     this.checkEveryoneDone();
   }
@@ -333,11 +355,24 @@ class Room {
     return {};
   }
 
+  // 2-player act-offs: rate the other actor 1–5 stars.
+  submitRating(playerId, stars) {
+    const a = this.actoff;
+    if (this.phase !== 'voting' || !a || a.mode !== 'rate') return { error: 'Rating isn\u2019t open.' };
+    if (!a.actors.includes(playerId)) return { error: 'Only the actors rate each other.' };
+    const n = Number(stars);
+    if (!Number.isInteger(n) || n < 1 || n > 5) return { error: 'Pick 1 to 5 stars.' };
+    a.ratings.set(playerId, n);
+    this.broadcast();
+    this.checkEveryoneDone();
+    return {};
+  }
+
   finishActOff() {
     this.clearTimer();
     if (this.phase !== 'voting') return;
     const a = this.actoff;
-    a.result = scoreActOff(a.actors, a.votes);
+    a.result = a.mode === 'rate' ? scoreRatings(a.actors, a.ratings) : scoreActOff(a.actors, a.votes);
     for (const id of a.actors) {
       const p = this.players.get(id);
       if (!p) continue;
@@ -446,7 +481,8 @@ class Room {
       number: a.number,
       actors: a.actors,
       prompt: a.prompt,
-      voted: [...a.votes.keys()],
+      mode: a.mode,
+      voted: a.mode === 'rate' ? [...a.ratings.keys()] : [...a.votes.keys()],
       result: this.phase === 'actoff-result' ? a.result : null,
     };
   }
@@ -475,7 +511,7 @@ class Room {
       }
     }
     if (this.actoff && ['actoff', 'voting', 'actoff-result'].includes(this.phase)) {
-      view.actoff = { ...this.actoffView(), yourVote: this.actoff.votes.get(player.id) || null, youAreActor: this.actoff.actors.includes(player.id) };
+      view.actoff = { ...this.actoffView(), yourVote: this.actoff.votes.get(player.id) || null, yourRating: this.actoff.ratings.get(player.id) || null, youAreActor: this.actoff.actors.includes(player.id) };
     }
     return view;
   }

@@ -88,7 +88,7 @@ function render() {
   const a = state.actoff;
   const key = JSON.stringify([
     state.phase, state.progress && state.progress.question, q && q.locked, q && q.result,
-    a && [a.actors, a.prompt, a.yourVote, a.result], state.you.edge, state.you.score,
+    a && [a.actors, a.prompt && a.prompt.text, a.yourVote, a.yourRating, a.mode, a.result], state.you.edge, state.you.score,
     state.phase === 'lobby' || state.phase === 'final' ? state.players.map((p) => [p.name, p.score]) : null,
     state.leaderId === state.you.id, state.phase === 'lobby' ? state.settings : null,
     q && q.sabotagedBy, state.you.sabotages,
@@ -240,34 +240,50 @@ function answerView() {
 
 function actoffView() {
   const a = state.actoff;
+  const twoPlayer = state.players.filter((p) => p.connected).length <= 2;
   if (a.youAreActor) {
     const partner = a.actors.find((id) => id !== state.you.id);
     return h('div.stack.center.pop',
-      h('div.big-emoji', '\u{1F3AD}'),
-      h('h1', 'You’re on stage!'),
-      h('p', 'You and ', h('strong', { style: { color: colorOf(partner) } }, nameOf(partner)), ' both act out:'),
-      h('div.act-prompt', `“${a.prompt}”`),
-      h('p.muted', 'Take turns. No time limit, so go big! Win the vote for 1,500 pts and the ⚡ EDGE.'),
+      h('h1', '\u{1F3AD} You\u2019re on stage!'),
+      h('p', { style: { margin: 0 } }, 'You and ', h('strong', { style: { color: colorOf(partner) } }, nameOf(partner)), ' both act out:'),
+      promptBlock(a.prompt),
+      h('p.muted', twoPlayer
+        ? 'Take turns, no time limit, so go big! Then you\u2019ll rate each other. Win for 1,500 pts and the \u26A1 EDGE.'
+        : 'Take turns, no time limit, so go big! Win the vote for 1,500 pts and the \u26A1 EDGE.'),
     );
   }
   return h('div.stack.center.pop',
-    h('div.big-emoji', '\u{1F37F}'),
-    h('h1', 'Act-off!'),
-    h('p', h('strong', { style: { color: colorOf(a.actors[0]) } }, nameOf(a.actors[0])), ' vs ', h('strong', { style: { color: colorOf(a.actors[1]) } }, nameOf(a.actors[1]))),
-    h('div.act-prompt', `“${a.prompt}”`),
-    h('p.muted', 'Watch them both. Voting opens when they’re done!'),
+    h('h1', '\u{1F37F} Act-off!'),
+    h('p', { style: { margin: 0 } }, h('strong', { style: { color: colorOf(a.actors[0]) } }, nameOf(a.actors[0])), ' vs ', h('strong', { style: { color: colorOf(a.actors[1]) } }, nameOf(a.actors[1]))),
+    promptBlock(a.prompt),
+    h('p.muted', 'Watch them both. Voting opens when they\u2019re done!'),
   );
 }
 
 function votingView() {
   const a = state.actoff;
-  if (a.youAreActor) {
-    return h('div.stack.center.pop', h('div.big-emoji', '\u{1F91E}'), h('h1', 'Everyone’s voting…'), h('p.muted', 'Fingers crossed!'));
-  }
   const err = h('p.error');
+  if (a.mode === 'rate') {
+    // 2-player game: rate the other actor.
+    const partner = a.actors.find((id) => id !== state.you.id);
+    return h('div.stack.center.pop',
+      h('h1', '\u2B50 Rate ', h('span', { style: { color: colorOf(partner) } }, nameOf(partner))),
+      promptBlock(a.prompt, { small: true }),
+      h('p.muted', { style: { margin: 0 } }, `How good was ${nameOf(partner)}\u2019s acting? Be honest!`),
+      h('div.star-row', [1, 2, 3, 4, 5].map((n) => h('button.star-btn', {
+        class: a.yourRating && n <= a.yourRating ? 'on' : '',
+        onclick: async () => { const res = await emit('player:rate', { stars: n }); if (res.error) err.textContent = res.error; },
+      }, '\u2B50'))),
+      a.yourRating ? h('p.muted', `You gave ${stars(a.yourRating)}. You can change it until rating closes.`) : h('p.muted', 'Tap 1 to 5 stars.'),
+      err,
+    );
+  }
+  if (a.youAreActor) {
+    return h('div.stack.center.pop', h('div.big-emoji', '\u{1F91E}'), h('h1', 'Everyone\u2019s voting\u2026'), h('p.muted', 'Fingers crossed!'));
+  }
   return h('div.stack.center.pop',
-    h('h1', '\u{1F5F3}️ Who did it better?'),
-    h('div.act-prompt', { style: { fontSize: '1.3rem' } }, `“${a.prompt}”`),
+    h('h1', '\u{1F5F3}\uFE0F Who did it better?'),
+    promptBlock(a.prompt, { small: true }),
     a.actors.map((id) => h('button.vote-btn', {
       class: a.yourVote === id ? 'sel' : '',
       style: { '--c': colorOf(id) },
@@ -289,6 +305,7 @@ function actoffResultView() {
     h('div.big-emoji', actor ? (won ? (tie ? '\u{1F91D}' : '\u{1F451}') : '\u{1F44F}') : '\u{1F3AD}'),
     h('h1', actor ? (tie ? 'It’s a tie!' : won ? 'You won the act-off!' : 'So brave!') : tie ? 'It’s a tie!' : `${nameOf(r.winners[0])} wins!`),
     actor ? h('div.result-big', '+' + r.points[me].toLocaleString()) : null,
+    actor && state.actoff.mode === 'rate' ? h('p', `${nameOf(state.actoff.actors.find((id) => id !== me))} gave you ${stars(r.tally[me])}`) : null,
     state.you.edge ? h('div.edge-banner', h('strong', '⚡ You have the EDGE'), ' for the next round!') : null,
     h('div.card', h('p', { style: { margin: 0 } }, `You’re in `, h('strong', `#${place}`), ` with ${state.you.score.toLocaleString()} pts`)),
     h('p.muted', 'Check the big screen for the scoreboard!'),
@@ -338,18 +355,22 @@ function hostControls() {
     case 'answer': {
       const endOfSet = p.question % p.perSet === 0;
       const last = p.question >= p.total;
-      const willActOff = endOfSet && state.players.filter((x) => x.connected).length >= 3;
+      const willActOff = endOfSet && state.players.filter((x) => x.connected).length >= 2;
       body = [btn(willActOff ? '\u{1F3AD} Act-off time!' : last ? '\u{1F3C6} Final results' : 'Next question \u25B6', 'host:next', { block: true })];
       break;
     }
     case 'actoff':
       body = [
         h('div.row', { style: { justifyContent: 'center' } }, btn('\u{1F500} Different actors', 'host:reroll-actors', { secondary: true, small: true }), btn('\u{1F3B2} Different prompt', 'host:reroll-prompt', { secondary: true, small: true })),
-        btn('\u2705 Done acting \u2014 vote!', 'host:next', { block: true }),
+        btn(state.players.filter((x) => x.connected).length <= 2 ? '\u2705 Done acting \u2014 rate!' : '\u2705 Done acting \u2014 vote!', 'host:next', { block: true }),
+        btn('\u23ED\uFE0F Skip this act-off', 'host:skip-actoff', { secondary: true, small: true }),
       ];
       break;
     case 'voting':
-      body = [btn('Close voting', 'host:next', { secondary: true, block: true })];
+      body = [
+        btn(state.actoff.mode === 'rate' ? 'Close rating' : 'Close voting', 'host:next', { secondary: true, block: true }),
+        btn('\u23ED\uFE0F Skip this act-off', 'host:skip-actoff', { secondary: true, small: true }),
+      ];
       break;
     case 'actoff-result':
       body = [btn(p.question >= p.total ? '\u{1F3C6} Final results' : 'Next round \u25B6', 'host:next', { block: true })];

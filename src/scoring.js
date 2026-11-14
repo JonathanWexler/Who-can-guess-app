@@ -29,6 +29,20 @@ function scoreActOff(actors, votes) {
   for (const choice of votes instanceof Map ? votes.values() : Object.values(votes)) {
     if (choice in tally) tally[choice] += 1;
   }
+  return scoreTally(actors, tally);
+}
+
+/**
+ * 2-player act-offs: each actor rates the OTHER one 1–5 stars.
+ * @param {string[]} actors
+ * @param {Map<string,number>} ratings raterId -> stars given to the other actor
+ */
+function scoreRatings(actors, ratings) {
+  const [a, b] = actors;
+  return scoreTally(actors, { [a]: ratings.get(b) || 0, [b]: ratings.get(a) || 0 });
+}
+
+function scoreTally(actors, tally) {
   const [a, b] = actors;
   let winners;
   if (tally[a] === tally[b]) winners = [a, b];
@@ -40,4 +54,4 @@ function scoreActOff(actors, votes) {
   return { tally, winners, points };
 }
 
-module.exports = { isCorrect, scoreActOff, QUESTION_POINTS, ACT_WIN_POINTS, ACT_BRAVE_POINTS, ACT_TIE_POINTS, EDGE_WIGGLE };
+module.exports = { isCorrect, scoreActOff, scoreRatings, QUESTION_POINTS, ACT_WIN_POINTS, ACT_BRAVE_POINTS, ACT_TIE_POINTS, EDGE_WIGGLE };

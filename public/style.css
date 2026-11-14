@@ -319,3 +319,14 @@ button.chip { border: 0; color: inherit; font: inherit; font-weight: 600; cursor
 .evil-face { position: absolute; font-size: 120px; line-height: 1; transform: translate(-50%, -50%); cursor: pointer; user-select: none; transition: left .35s ease, top .35s ease; filter: drop-shadow(0 0 18px rgba(255,0,180,.7)); animation: evil-wobble .5s ease-in-out infinite alternate; }
 @keyframes evil-wobble { from { rotate: -12deg; } to { rotate: 12deg; } }
 .s-toast { position: absolute; top: 3cqh; left: 50%; z-index: 70; background: #8e2fc2; color: #fff; font-size: 5cqh; font-weight: 700; padding: 1.5cqh 4cqh; border-radius: 99px; box-shadow: 0 1cqh 3cqh rgba(0,0,0,.4); white-space: nowrap; }
+
+/* ---- act-off prompt ---- */
+.act-prompt-block { background: var(--card2); border: 3px solid var(--accent); border-radius: var(--radius); padding: 14px 18px; text-align: center; }
+.act-kind { font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-size: .9rem; }
+.act-emoji { font-size: clamp(3.5rem, 12vw, 7rem); line-height: 1.1; }
+.act-prompt-block .act-prompt { margin: 4px 0 0; }
+.act-prompt-block.small .act-emoji { font-size: 2.6rem; }
+.act-prompt-block.small .act-prompt { font-size: 1.3rem; }
+.star-row { display: flex; justify-content: center; gap: 6px; }
+.star-btn { font-size: 2.6rem; background: none; border: 0; padding: 4px; filter: grayscale(1) opacity(.45); cursor: pointer; transition: transform .1s; }
+.star-btn.on { filter: none; transform: scale(1.1); }

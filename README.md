@@ -21,9 +21,12 @@ random players get up for an **act-off**, and everyone else votes for who did it
    - The big screen only shows **who has answered**, never who was right.
    - Each phone privately shows ✅ or ❌ and the correct answer.
 5. **Act-off** (after every 3–4 questions): two random players come up and act out the same
-   silly prompt ("A penguin who is late for school"). There's **no time limit**. The host taps
-   *Done acting*, and everyone else votes on their phone. The host can reroll the actors or
-   the prompt.
+   prompt: an **animal** ("🐾 A kangaroo with the hiccups") or a **character** ("🦸 A pirate
+   who is scared of water"). There's **no time limit**. The host taps *Done acting*, then:
+   - **3+ players:** everyone who didn't act votes on their phone for who did it better.
+   - **2 players:** the two actors rate each other 1–5 stars, and the higher rating wins.
+
+   The host can reroll the actors or the prompt, or **skip the act-off** (no points, no EDGE).
 6. Scores are revealed after each act-off, then the next round starts.
 
 ### 😈 Sabotage
@@ -72,7 +75,8 @@ Rain, Dino Pizza Party, Countdown Glitch, Odd One Out, Card Memory, Shape Storm.
 Missing?, Paint Mixer, Eye Tricks (optical illusions), Quick Clock, What Comes Next?, Who
 Moved?, Emoji Mash-Up, Broken Rainbow, Tower Race.
 
-There are also **60 act-off prompts** in `src/actprompts.js`.
+There are also **80 act-off prompts** in `src/actprompts.js`: 40 animals and 40 characters,
+about half with a silly twist.
 
 ## Running it
 

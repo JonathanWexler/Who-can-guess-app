@@ -60,7 +60,7 @@ function newRoom() {
 function render() {
   const q = state.question;
   const a = state.actoff;
-  const key = JSON.stringify([state.phase, q && q.id, state.progress && state.progress.question, a && a.actors, a && a.prompt, state.phase === 'lobby' ? [state.players.map((p) => [p.id, p.connected]), state.settings, joinBase, state.leaderId] : null, state.phase === 'final' ? state.players : null]);
+  const key = JSON.stringify([state.phase, q && q.id, state.progress && state.progress.question, a && a.actors, a && a.prompt && a.prompt.text, state.phase === 'lobby' ? [state.players.map((p) => [p.id, p.connected]), state.settings, joinBase, state.leaderId] : null, state.phase === 'final' ? state.players : null]);
   if (key !== current.key) {
     const view = { lobby: lobbyView, question: questionView, answer: answerView, actoff: actoffView, voting: votingView, 'actoff-result': actoffResultView, final: finalView }[state.phase]();
     current = { key, update: view.update || null };
@@ -194,7 +194,7 @@ function answerView() {
   const endOfSet = p.question % p.perSet === 0;
   const last = p.question >= p.total;
   const connected = state.players.filter((x) => x.connected).length;
-  const willActOff = endOfSet && connected >= 3;
+  const willActOff = endOfSet && connected >= 2;
   const nextLabel = willActOff ? '\u{1F3AD} Act-off time!' : last ? '\u{1F3C6} Final results' : 'Next question ▶';
   const el = h('section.card.center.stack.pop',
     h('div.round-tag', progressTag()),
@@ -223,41 +223,51 @@ function actorCards(a, { votes } = {}) {
 
 function actoffView() {
   const a = state.actoff;
+  const twoPlayer = state.players.filter((p) => p.connected).length <= 2;
   const el = h('section.card.center.stack.pop',
     h('div.round-tag', `Act-off ${a.number}`),
     h('h1.logo', '\u{1F3AD} ACT-', h('span', 'OFF!')),
     h('p.muted', 'Come on up! You both act out the same thing, one at a time:'),
     actorCards(a),
-    h('div.act-prompt', `“${a.prompt}”`),
-    h('p.muted', 'No time limit. When you’re both done, everyone votes on their phone for who did it better!'),
+    promptBlock(a.prompt),
+    h('p.muted', twoPlayer
+      ? 'No time limit. When you\u2019re both done, you\u2019ll rate each other 1\u20135 stars on your phones!'
+      : 'No time limit. When you\u2019re both done, everyone else votes on their phone for who did it better!'),
     h('div.row', { style: { justifyContent: 'center' } },
       h('button.btn.secondary.small', { onclick: () => emit('host:reroll-actors') }, '\u{1F500} Different actors'),
       h('button.btn.secondary.small', { onclick: () => emit('host:reroll-prompt') }, '\u{1F3B2} Different prompt'),
+      h('button.btn.secondary.small', { onclick: () => emit('host:skip-actoff') }, '\u23ED\uFE0F Skip act-off'),
     ),
-    h('div', h('button.btn', { onclick: next }, '✅ Done acting — vote!')),
+    h('div', h('button.btn', { onclick: next }, twoPlayer ? '\u2705 Done acting \u2014 rate!' : '\u2705 Done acting \u2014 vote!')),
   );
   return { el };
 }
 
 function votingView() {
   const a = state.actoff;
+  const rate = a.mode === 'rate';
   const status = h('div');
   const el = h('section.card.center.stack.pop',
     h('div.round-tag', `Act-off ${a.number}`),
-    h('h1', '\u{1F5F3}️ Vote on your phones!'),
-    h('div.act-prompt', `“${a.prompt}”`),
+    h('h1', rate ? '\u2B50 Rate each other on your phones!' : '\u{1F5F3}\uFE0F Vote on your phones!'),
+    promptBlock(a.prompt, { small: true }),
     actorCards(a),
     status,
-    h('div', h('button.btn.secondary.small', { onclick: next }, 'Close voting')),
+    h('div.row', { style: { justifyContent: 'center' } },
+      h('button.btn.secondary.small', { onclick: next }, rate ? 'Close rating' : 'Close voting'),
+      h('button.btn.secondary.small', { onclick: () => emit('host:skip-actoff') }, '\u23ED\uFE0F Skip act-off'),
+    ),
   );
   return {
     el,
     update(s) {
-      const voters = s.players.filter((p) => p.connected && !s.actoff.actors.includes(p.id));
+      const voters = s.actoff.mode === 'rate'
+        ? s.players.filter((p) => p.connected && s.actoff.actors.includes(p.id))
+        : s.players.filter((p) => p.connected && !s.actoff.actors.includes(p.id));
       const voted = new Set(s.actoff.voted);
       status.replaceChildren(
-        h('p', h('strong', `${voted.size}/${voters.length} voted`)),
-        h('div.chips', { style: { justifyContent: 'center' } }, voters.map((p) => h('span.chip', { class: voted.has(p.id) ? 'done' : '' }, swatch(p.color), p.name, voted.has(p.id) ? ' ✔' : ''))),
+        h('p', h('strong', `${voted.size}/${voters.length} ${s.actoff.mode === 'rate' ? 'rated' : 'voted'}`)),
+        h('div.chips', { style: { justifyContent: 'center' } }, voters.map((p) => h('span.chip', { class: voted.has(p.id) ? 'done' : '' }, swatch(p.color), p.name, voted.has(p.id) ? ' \u2714' : ''))),
       );
     },
   };
@@ -279,7 +289,8 @@ function actoffResultView() {
     h('section.card.center.stack.pop',
       h('div.round-tag', `Act-off ${a.number} results`),
       h('h1', tie ? '\u{1F91D} It’s a tie!' : `\u{1F451} ${ids[r.winners[0]]?.name} wins!`),
-      actorCards(a, { votes: a.actors.map((id) => r.tally[id]) }),
+      actorCards(a, { votes: a.actors.map((id) => (a.mode === 'rate' ? stars(r.tally[id]) : r.tally[id])) }),
+      a.mode === 'rate' ? h('p.muted', { style: { margin: 0 } }, 'Stars each actor got from the other') : null,
       h('p', a.actors.map((id) => `${ids[id]?.name} +${r.points[id].toLocaleString()}`).join('   ·   ')),
       !last ? h('div.edge-banner', h('strong', '⚡ EDGE: '), r.winners.map((id) => ids[id]?.name).join(' & '), ' get', r.winners.length === 1 ? 's' : '', ' a slight advantage for the next round of questions!') : null,
       h('div', h('button.btn', { onclick: next }, last ? '\u{1F3C6} Final results' : 'Next round ▶')),
