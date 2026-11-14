@@ -1,0 +1,792 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Manny Is Nine!</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg1: #ffe5f1; --bg2: #e3f0ff;
+    --ink: #2b2150; --muted: #6d6593;
+    --pink: #ff5d9e; --yellow: #ffd23f; --blue: #4d8dff; --green: #3cc977; --purple: #9b5de5; --orange: #ff9a3c;
+    --card: #ffffff; --tile: #fff7d6;
+    --radius: 22px;
+    font-family: 'Fredoka', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    color: var(--ink); background: linear-gradient(160deg, var(--bg1), var(--bg2)) fixed;
+    overscroll-behavior: none; user-select: none; -webkit-user-select: none;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 12px 16px 32px; }
+
+  /* ---- top bar + secret message ---- */
+  .top { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .top h1 { margin: 0; font-size: 1.35rem; flex: 1; }
+  .icon-btn { border: 0; background: #fff; border-radius: 999px; width: 44px; height: 44px; font-size: 1.3rem; box-shadow: 0 3px 0 rgba(0,0,0,.12); }
+  .board { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; background: #fff; border-radius: var(--radius); padding: 12px 8px; box-shadow: 0 5px 0 rgba(0,0,0,.08); }
+  .word { display: flex; gap: 5px; }
+  .slot { width: clamp(30px, 8.5vw, 46px); aspect-ratio: 4 / 5; border-radius: 10px; display: grid; place-items: center; font-weight: 700; font-size: clamp(1.2rem, 5.5vw, 2rem); background: #efeaff; color: transparent; border: 3px dashed #cfc5f5; }
+  /* compact board while a game is being played, so the game fits on a phone */
+  body.playing .board { padding: 6px; gap: 4px 10px; }
+  body.playing .slot { width: 24px; font-size: 1rem; border-width: 2px; border-radius: 7px; }
+  body.playing .lvl-head { margin-top: 8px; }
+  body.playing .goal { padding: 6px 12px; font-size: 1rem; }
+  .slot.on { background: var(--yellow); color: var(--ink); border: 3px solid #e2b400; box-shadow: 0 3px 0 #c99f00; }
+  .slot.pop { animation: pop .6s cubic-bezier(.3, 1.8, .5, 1); }
+  @keyframes pop { 0% { transform: scale(.2) rotate(-30deg); } 100% { transform: scale(1) rotate(0); } }
+
+  /* ---- home ---- */
+  .hello { text-align: center; margin: 16px 0 10px; }
+  .hello h2 { font-size: clamp(1.6rem, 7vw, 2.4rem); margin: 0; }
+  .hello p { margin: 6px 0 0; color: var(--muted); font-size: 1.05rem; }
+  .levels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 14px; }
+  .level { border: 0; border-radius: var(--radius); background: #fff; padding: 12px 6px 10px; box-shadow: 0 5px 0 rgba(0,0,0,.1); display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 112px; position: relative; transition: transform .1s; }
+  .level:active { transform: translateY(3px); box-shadow: 0 2px 0 rgba(0,0,0,.1); }
+  .level .num { position: absolute; top: 6px; left: 10px; font-weight: 700; color: var(--muted); font-size: .85rem; }
+  .level .em { font-size: 2.4rem; line-height: 1.1; }
+  .level .nm { font-weight: 600; font-size: .9rem; text-align: center; line-height: 1.1; }
+  .level.done { background: #e6fbef; }
+  .level.done .badge { position: absolute; top: 6px; right: 8px; background: var(--yellow); border-radius: 8px; padding: 0 6px; font-weight: 700; font-size: .8rem; }
+  .level.locked { opacity: .45; }
+  .level.next { outline: 4px solid var(--pink); animation: nudge 1.4s ease-in-out infinite; }
+  @keyframes nudge { 50% { transform: scale(1.05); } }
+
+  /* ---- level screen ---- */
+  .lvl-head { display: flex; align-items: center; gap: 10px; margin: 14px 0 6px; }
+  .lvl-head h2 { margin: 0; font-size: 1.4rem; flex: 1; }
+  .goal { background: #fff; border-radius: 16px; padding: 10px 14px; font-size: 1.1rem; text-align: center; box-shadow: 0 4px 0 rgba(0,0,0,.08); }
+  .meter { height: 14px; border-radius: 99px; background: #fff; overflow: hidden; margin: 10px 0; box-shadow: inset 0 0 0 2px #e4ddff; }
+  .meter > div { height: 100%; width: 0; background: linear-gradient(90deg, var(--pink), var(--yellow)); transition: width .3s; }
+  .arena { position: relative; background: #fff; border-radius: var(--radius); overflow: hidden; box-shadow: 0 6px 0 rgba(0,0,0,.08); touch-action: none; }
+  .big-btn { border: 0; border-radius: 999px; background: var(--pink); color: #fff; font-weight: 700; font-size: 1.25rem; padding: 14px 26px; box-shadow: 0 5px 0 #c73b78; }
+  .big-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #c73b78; }
+  .big-btn.alt { background: var(--blue); box-shadow: 0 5px 0 #2f63c4; }
+  .center { text-align: center; }
+  .shake { animation: shake .4s; }
+  @keyframes shake { 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
+
+  /* balloons */
+  .balloon { position: absolute; width: 74px; height: 92px; border: 0; padding: 0; background: none; }
+  .balloon .b { width: 74px; height: 86px; border-radius: 50% 50% 46% 46%; display: grid; place-items: center; font-weight: 700; font-size: 2rem; color: #fff; box-shadow: inset -8px -10px 0 rgba(0,0,0,.12), inset 8px 8px 0 rgba(255,255,255,.25); text-shadow: 0 2px 0 rgba(0,0,0,.2); }
+  .balloon .s { width: 2px; height: 40px; background: #999; margin: 0 auto; }
+  .boom { position: absolute; font-size: 3rem; pointer-events: none; transform: translate(-50%, -50%); }
+
+  /* memory */
+  .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 12px; }
+  .mcard { aspect-ratio: 3 / 4; border: 0; border-radius: 16px; perspective: 600px; background: none; padding: 0; }
+  .mcard .in { position: relative; width: 100%; height: 100%; transition: transform .35s; transform-style: preserve-3d; }
+  .mcard.up .in, .mcard.got .in { transform: rotateY(180deg); }
+  .mcard .f, .mcard .k { position: absolute; inset: 0; border-radius: 16px; display: grid; place-items: center; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+  .mcard .k { background: repeating-linear-gradient(45deg, var(--purple) 0 10px, #b685ff 10px 20px); color: #fff; font-size: 2rem; font-weight: 700; }
+  .mcard .f { background: var(--tile); transform: rotateY(180deg); font-size: clamp(2rem, 9vw, 3.2rem); }
+  .mcard.got .f { background: #d9f8e5; }
+
+  /* simon */
+  .pads { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 16px; }
+  .pad { aspect-ratio: 1; border: 0; border-radius: 28px; font-size: 3.4rem; opacity: .55; transition: opacity .1s, transform .1s; box-shadow: 0 6px 0 rgba(0,0,0,.18); }
+  .pad.lit { opacity: 1; transform: scale(1.05); }
+  .pad:disabled { cursor: default; }
+
+  /* maze */
+  .maze { display: grid; margin: 12px auto; border: 4px solid var(--ink); border-radius: 8px; background: #fffaf0; }
+  .cell { position: relative; aspect-ratio: 1; display: grid; place-items: center; font-size: clamp(1.1rem, 5.5vw, 1.8rem); border: 0 solid var(--ink); }
+  .cell.t { border-top-width: 3px; } .cell.r { border-right-width: 3px; } .cell.b { border-bottom-width: 3px; } .cell.l { border-left-width: 3px; }
+  .cell.trail { background: #ffe3ef; }
+  .dpad { display: grid; grid-template-columns: repeat(3, 60px); grid-template-rows: repeat(2, 54px); gap: 8px; justify-content: center; margin-top: 8px; }
+  .dpad button { border: 0; border-radius: 16px; background: var(--blue); color: #fff; font-size: 1.8rem; box-shadow: 0 4px 0 #2f63c4; }
+  .dpad button:active { transform: translateY(3px); box-shadow: 0 1px 0 #2f63c4; }
+
+  /* word scramble */
+  .slots, .tiles { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+  .ltile { width: 56px; height: 64px; border: 0; border-radius: 14px; font-size: 2rem; font-weight: 700; background: var(--yellow); box-shadow: 0 4px 0 #c99f00; }
+  .ltile:disabled { opacity: .25; }
+  .lslot { width: 56px; height: 64px; border-radius: 14px; display: grid; place-items: center; font-size: 2rem; font-weight: 700; background: #efeaff; border: 3px dashed #cfc5f5; }
+  .lslot.full { background: #fff; border: 3px solid var(--purple); }
+  .hint { font-size: 3.4rem; text-align: center; }
+
+  /* math */
+  .sum { font-size: clamp(2.4rem, 11vw, 3.6rem); font-weight: 700; text-align: center; margin: 18px 0 8px; }
+  .answers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 0 12px 16px; }
+  .answers button { border: 0; border-radius: 20px; font-size: 2.4rem; font-weight: 700; padding: 16px 0; background: var(--tile); box-shadow: 0 5px 0 #e2c86a; }
+  .answers button.right { background: #b8f5cf; }
+
+  /* catch */
+  .item { position: absolute; font-size: 2.6rem; line-height: 1; transform: translate(-50%, -50%); pointer-events: none; }
+  .basket { position: absolute; bottom: 8px; font-size: 3.6rem; line-height: 1; transform: translateX(-50%); pointer-events: none; }
+  .float { position: absolute; font-weight: 700; font-size: 1.6rem; pointer-events: none; transform: translate(-50%, -50%); }
+
+  /* bubbles */
+  .bubble { position: absolute; width: 70px; height: 70px; border-radius: 50%; border: 0; display: grid; place-items: center; font-size: 2rem; font-weight: 700; color: #1d3c7a; background: radial-gradient(circle at 30% 30%, #fff, #bfe2ff 45%, #7cc0ff); box-shadow: inset 0 0 0 3px rgba(255,255,255,.7), 0 4px 10px rgba(0,0,0,.12); transform: translate(-50%, -50%); }
+  .bubble.gone { animation: bye .3s forwards; }
+  @keyframes bye { to { transform: translate(-50%, -50%) scale(1.6); opacity: 0; } }
+
+  /* photo puzzle */
+  .puzzle { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; padding: 3px; background: var(--ink); border-radius: 14px; width: min(100%, 400px, calc((100vh - 380px) * 0.75)); margin: 12px auto; }
+  .ptile { aspect-ratio: 1; border: 0; padding: 0; border-radius: 6px; background-image: url(manny.jpg); background-size: 300% 400%; transition: transform .12s, box-shadow .12s; }
+  .ptile.sel { transform: scale(.92); box-shadow: 0 0 0 5px var(--yellow); }
+  .ptile.ok { box-shadow: inset 0 0 0 3px rgba(60, 201, 119, .9); }
+  .puzzle.solved { gap: 0; padding: 0; transition: gap .4s, padding .4s; }
+  .puzzle.solved .ptile { border-radius: 0; box-shadow: none; }
+  .peek { width: 120px; border-radius: 10px; box-shadow: 0 4px 0 rgba(0,0,0,.12); }
+
+  /* overlays */
+  .overlay { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: rgba(43, 33, 80, .55); padding: 16px; }
+  .reward { background: #fff; border-radius: 28px; padding: 24px; text-align: center; max-width: 380px; width: 100%; animation: pop .5s cubic-bezier(.3, 1.6, .5, 1); }
+  .reward .bigl { display: inline-grid; place-items: center; width: 110px; height: 130px; margin: 10px 4px; border-radius: 18px; background: var(--yellow); font-size: 4.6rem; font-weight: 700; box-shadow: 0 6px 0 #c99f00; }
+  canvas.confetti { position: fixed; inset: 0; pointer-events: none; z-index: 60; }
+
+  /* finale */
+  .finale { text-align: center; }
+  .finale .msg { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 16px; margin: 10px 0 16px; }
+  .finale .msg span { display: inline-block; font-size: clamp(2.4rem, 12vw, 4.4rem); font-weight: 700; color: var(--pink); text-shadow: 0 4px 0 #fff, 0 6px 0 rgba(0,0,0,.1); animation: hop 1s ease-in-out infinite; }
+  @keyframes hop { 50% { transform: translateY(-12px); } }
+  .finale img { width: min(100%, 420px); border-radius: 22px; border: 8px solid #fff; box-shadow: 0 10px 30px rgba(0,0,0,.2); animation: pop .8s cubic-bezier(.3, 1.4, .5, 1); }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <h1>🎂 Manny Is Nine!</h1>
+    <button class="icon-btn" id="sound" title="Sound on/off">🔊</button>
+  </div>
+  <div class="board" id="board"></div>
+  <main id="screen"></main>
+</div>
+
+<script>
+// ===== Manny Is Nine =======================================================
+// 9 mini-games (Manny is turning 9!). Each one earns letters; together they
+// spell the secret message MANNY IS NINE. The last game is a photo puzzle.
+
+const MESSAGE = 'MANNY IS NINE';
+// Which letters (index into MESSAGE) each level unlocks.
+const LEVEL_LETTERS = [[0], [1], [2], [3], [4], [6, 7], [9, 10], [11], [12]];
+
+const LEVELS = [
+  { name: 'Pop the M’s', emoji: '\u{1F388}', play: balloonLevel },
+  { name: 'Memory Match', emoji: '\u{1F0CF}', play: memoryLevel },
+  { name: 'Copy the Colors', emoji: '\u{1F3B5}', play: simonLevel },
+  { name: 'Puppy Maze', emoji: '\u{1F436}', play: mazeLevel },
+  { name: 'Word Scramble', emoji: '\u{1F524}', play: wordLevel },
+  { name: 'Birthday Math', emoji: '➕', play: mathLevel },
+  { name: 'Catch the Treats', emoji: '\u{1F9FA}', play: catchLevel },
+  { name: 'Bubble Count', emoji: '\u{1FAE7}', play: bubbleLevel },
+  { name: 'Photo Puzzle', emoji: '\u{1F9E9}', play: puzzleLevel },
+];
+
+// ---- tiny helpers -----------------------------------------------------------
+function h(tag, attrs, ...kids) {
+  const [name, ...cls] = tag.split('.');
+  const el = document.createElement(name || 'div');
+  if (cls.length) el.className = cls.join(' ');
+  if (attrs != null && (typeof attrs !== 'object' || attrs instanceof Node || Array.isArray(attrs))) { kids.unshift(attrs); attrs = null; }
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null || v === false) continue;
+    if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else if (k === 'style') Object.assign(el.style, v);
+    else if (k === 'class') el.className += ' ' + v;
+    else el.setAttribute(k, v === true ? '' : v);
+  }
+  for (const c of kids.flat(Infinity)) if (c != null && c !== false) el.append(c instanceof Node ? c : document.createTextNode(String(c)));
+  return el;
+}
+const rand = (a, b) => a + Math.random() * (b - a);
+const randi = (a, b) => Math.floor(rand(a, b + 1));
+const pick = (list) => list[Math.floor(Math.random() * list.length)];
+const shuffle = (list) => { const a = [...list]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+// replaceChildren() that skips null/false (it would otherwise print "null").
+const fill = (el, ...kids) => el.replaceChildren(...kids.flat().filter((k) => k != null && k !== false));
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+function wiggle(el) { el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
+
+// ---- sound (little synth beeps, no files needed) -----------------------------
+let muted = store.get('manny9-muted', false);
+let audio = null;
+function tone(freq, ms = 120, type = 'sine', vol = 0.15, delay = 0) {
+  if (muted) return;
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    const t = audio.currentTime + delay / 1000;
+    const o = audio.createOscillator();
+    const g = audio.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + ms / 1000);
+    o.connect(g).connect(audio.destination);
+    o.start(t);
+    o.stop(t + ms / 1000 + 0.02);
+  } catch {}
+}
+const sfx = {
+  good: () => { tone(660, 90, 'triangle'); tone(990, 140, 'triangle', 0.12, 80); },
+  bad: () => tone(180, 180, 'square', 0.06),
+  pop: () => tone(rand(500, 900), 70, 'triangle', 0.12),
+  win: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 220, 'triangle', 0.14, i * 120)),
+};
+const soundBtn = document.getElementById('sound');
+const paintSound = () => (soundBtn.textContent = muted ? '\u{1F507}' : '\u{1F50A}');
+soundBtn.onclick = () => { muted = !muted; store.set('manny9-muted', muted); paintSound(); if (!muted) sfx.good(); };
+paintSound();
+
+// ---- progress + secret message board -----------------------------------------
+let done = new Set(store.get('manny9-done', []));
+const save = () => store.set('manny9-done', [...done]);
+const earned = () => new Set([...done].flatMap((l) => LEVEL_LETTERS[l]));
+
+function drawBoard(fresh = []) {
+  const have = earned();
+  const board = document.getElementById('board');
+  board.replaceChildren(...MESSAGE.split(' ').map((word, w) => {
+    const offset = MESSAGE.split(' ').slice(0, w).join(' ').length + (w ? 1 : 0);
+    return h('div.word', [...word].map((ch, i) => {
+      const idx = offset + i;
+      return h('div.slot', { class: (have.has(idx) ? 'on' : '') + (fresh.includes(idx) ? ' pop' : '') }, have.has(idx) ? ch : '?');
+    }));
+  }));
+}
+
+// ---- screens ------------------------------------------------------------------
+const screen = document.getElementById('screen');
+let stopLevel = null; // cleanup for the running level
+
+function home() {
+  document.body.classList.remove('playing');
+  if (stopLevel) { stopLevel(); stopLevel = null; }
+  drawBoard();
+  if (done.size === LEVELS.length) return finale();
+  const next = LEVELS.findIndex((_, i) => !done.has(i));
+  fill(screen,
+    h('div.hello',
+      h('h2', done.size ? 'Keep going, Manny! \u{1F31F}' : 'Happy Birthday, Manny! \u{1F389}'),
+      h('p', done.size ? `${done.size} of 9 games done. Can you finish the secret message?` : 'Win the 9 games to spell out the secret message!'),
+    ),
+    h('div.levels', LEVELS.map((lv, i) => {
+      const isDone = done.has(i);
+      const locked = !isDone && i !== next;
+      return h('button.level', {
+        class: (isDone ? 'done' : '') + (locked ? ' locked' : '') + (i === next ? ' next' : ''),
+        onclick: () => (locked ? (sfx.bad(), wiggle(screen.querySelectorAll('.level')[i])) : startLevel(i)),
+      },
+        h('span.num', i + 1),
+        isDone ? h('span.badge', LEVEL_LETTERS[i].map((k) => MESSAGE[k]).join('')) : null,
+        h('span.em', locked ? '\u{1F512}' : lv.emoji),
+        h('span.nm', lv.name),
+      );
+    })),
+    done.size ? h('p.center', { style: { marginTop: '22px' } }, h('button.big-btn.alt', { style: { fontSize: '.9rem', padding: '8px 16px' }, onclick: () => { if (confirm('Start the whole game over?')) { done = new Set(); save(); home(); } } }, 'Start over')) : null,
+  );
+}
+
+function startLevel(i) {
+  document.body.classList.add('playing');
+  if (stopLevel) stopLevel();
+  const lv = LEVELS[i];
+  const timers = new Set();
+  let alive = true;
+  const ctx = {
+    after(ms, fn) { const t = setTimeout(() => { timers.delete(t); if (alive) fn(); }, ms); timers.add(t); return t; },
+    every(ms, fn) { const t = setInterval(() => alive && fn(), ms); timers.add(t); return t; },
+    frame(fn) { let last = performance.now(); const loop = (now) => { if (!alive) return; fn(Math.min(50, now - last)); last = now; requestAnimationFrame(loop); }; requestAnimationFrame(loop); },
+    get alive() { return alive; },
+  };
+  stopLevel = () => { alive = false; timers.forEach((t) => { clearTimeout(t); clearInterval(t); }); timers.clear(); };
+  const meterFill = h('div');
+  const goal = h('div.goal');
+  const area = h('div.arena');
+  screen.replaceChildren(
+    h('div.lvl-head', h('button.icon-btn', { onclick: home, title: 'Back' }, '⬅️'), h('h2', `${lv.emoji} ${lv.name}`), h('span', { style: { color: 'var(--muted)', fontWeight: 600 } }, `${i + 1}/9`)),
+    goal,
+    h('div.meter', meterFill),
+    area,
+  );
+  const api = {
+    ...ctx,
+    goal: (text) => (goal.textContent = text),
+    progress: (n, of) => (meterFill.style.width = Math.min(100, (n / of) * 100) + '%'),
+    win: () => { if (!alive) return; stopLevel(); stopLevel = null; levelWon(i); },
+  };
+  window.__win = api.win; // handy for testing
+  lv.play(area, api);
+}
+
+function levelWon(i) {
+  const isNew = !done.has(i);
+  done.add(i);
+  save();
+  sfx.win();
+  confetti();
+  const letters = LEVEL_LETTERS[i].map((k) => MESSAGE[k]);
+  const last = done.size === LEVELS.length;
+  const ov = h('div.overlay', h('div.reward',
+    h('h2', { style: { margin: 0 } }, pick(['Amazing!', 'You did it!', 'Super job!', 'Awesome!', 'Woo-hoo!']) + ' \u{1F389}'),
+    h('p', { style: { margin: '6px 0 0', fontSize: '1.1rem' } }, letters.length > 1 ? 'You earned the letters' : 'You earned the letter'),
+    h('div', letters.map((l) => h('span.bigl', l))),
+    h('p', h('button.big-btn', {
+      onclick: () => {
+        ov.remove();
+        home();
+        if (isNew) drawBoard(LEVEL_LETTERS[i]);
+      },
+    }, last ? 'See the secret message! \u{1F381}' : 'Next game ▶')),
+  ));
+  document.body.append(ov);
+}
+
+function finale() {
+  document.body.classList.remove('playing');
+  drawBoard();
+  screen.replaceChildren(h('div.finale',
+    h('div.msg', MESSAGE.split(' ').map((w, wi) => h('div', [...w].map((ch, i) => h('span', { style: { animationDelay: `${(wi * 4 + i) * 0.08}s` } }, ch))))),
+    h('h2', { style: { margin: '0 0 12px' } }, 'Happy 9th Birthday, Manny! \u{1F382}\u{1F388}'),
+    h('img', { src: 'manny.jpg', alt: 'Manny' }),
+    h('p', { style: { fontSize: '1.15rem', margin: '16px 0' } }, 'You won all 9 games and spelled the secret message!'),
+    h('p', h('button.big-btn', { onclick: () => { confetti(); sfx.win(); } }, 'More confetti! \u{1F38A}'), ' ', h('button.big-btn.alt', { onclick: () => { done = new Set(); save(); home(); } }, 'Play again')),
+  ));
+  confetti();
+  setTimeout(confetti, 900);
+}
+
+// ---- confetti ------------------------------------------------------------------
+function confetti() {
+  const c = h('canvas.confetti');
+  document.body.append(c);
+  const dpr = window.devicePixelRatio || 1;
+  c.width = innerWidth * dpr;
+  c.height = innerHeight * dpr;
+  const g = c.getContext('2d');
+  g.scale(dpr, dpr);
+  const colors = ['#ff5d9e', '#ffd23f', '#4d8dff', '#3cc977', '#9b5de5', '#ff9a3c'];
+  const bits = Array.from({ length: 140 }, () => ({ x: innerWidth / 2 + rand(-60, 60), y: innerHeight * 0.35, vx: rand(-7, 7), vy: rand(-14, -4), r: rand(0, 6), vr: rand(-0.3, 0.3), w: rand(6, 11), c: pick(colors) }));
+  const t0 = performance.now();
+  const tick = (now) => {
+    g.clearRect(0, 0, innerWidth, innerHeight);
+    for (const b of bits) {
+      b.vy += 0.35; b.x += b.vx; b.y += b.vy; b.r += b.vr;
+      g.save(); g.translate(b.x, b.y); g.rotate(b.r); g.fillStyle = b.c; g.fillRect(-b.w / 2, -b.w / 4, b.w, b.w / 2); g.restore();
+    }
+    if (now - t0 < 2600) requestAnimationFrame(tick); else c.remove();
+  };
+  requestAnimationFrame(tick);
+}
+
+// =================================================================================
+// 1. Pop the M's — letter balloons float up; pop the M's.
+function balloonLevel(area, api) {
+  const need = 6;
+  let got = 0;
+  api.goal(`Pop ${need} balloons with the letter M! \u{1F388}`);
+  api.progress(0, need);
+  Object.assign(area.style, { height: '62vh', background: 'linear-gradient(#bfe6ff, #eaf7ff)' });
+  const colors = ['#ff5d9e', '#4d8dff', '#3cc977', '#9b5de5', '#ff9a3c', '#f5c400'];
+  let sinceM = 0;
+  const spawn = () => {
+    // Make sure an M comes along at least every 3 balloons.
+    const letter = sinceM >= 2 || Math.random() < 0.35 ? 'M' : pick(['A', 'N', 'Y', 'W', 'H', 'E', 'O', 'R', 'B']);
+    sinceM = letter === 'M' ? 0 : sinceM + 1;
+    const b = h('button.balloon', h('div.b', { style: { background: pick(colors) } }, letter), h('div.s'));
+    const x = rand(4, 78);
+    b.style.left = x + '%';
+    area.append(b);
+    const H = area.clientHeight;
+    const anim = b.animate([{ top: H + 'px' }, { top: '-140px' }], { duration: rand(5200, 7200), easing: 'linear' });
+    anim.onfinish = () => b.remove();
+    b.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (letter !== 'M') { sfx.bad(); wiggle(b.firstChild); return; }
+      const r = b.getBoundingClientRect();
+      const a = area.getBoundingClientRect();
+      const boom = h('div.boom', { style: { left: r.left - a.left + 37 + 'px', top: r.top - a.top + 40 + 'px' } }, '\u{1F4A5}');
+      area.append(boom);
+      boom.animate([{ transform: 'translate(-50%,-50%) scale(.5)', opacity: 1 }, { transform: 'translate(-50%,-50%) scale(1.6)', opacity: 0 }], 400).onfinish = () => boom.remove();
+      b.remove();
+      sfx.pop();
+      got += 1;
+      api.progress(got, need);
+      if (got >= need) api.after(500, api.win);
+    });
+  };
+  spawn();
+  api.every(800, spawn);
+}
+
+// 2. Memory Match — flip cards to find pairs.
+function memoryLevel(area, api) {
+  const faces = shuffle(['\u{1F382}', '\u{1F388}', '\u{1F381}', '\u{1F9C1}', '\u{1F984}', '\u{1F436}']);
+  const deck = shuffle([...faces, ...faces]);
+  let open = [];
+  let pairs = 0;
+  let busy = false;
+  api.goal('Flip two cards at a time and find all the matching pairs!');
+  api.progress(0, 6);
+  const grid = h('div.cards');
+  deck.forEach((face) => {
+    const card = h('button.mcard', h('div.in', h('div.k', '?'), h('div.f', face)));
+    card.onclick = () => {
+      if (busy || card.classList.contains('up') || card.classList.contains('got')) return;
+      card.classList.add('up');
+      sfx.pop();
+      open.push({ card, face });
+      if (open.length < 2) return;
+      const [a, b] = open;
+      open = [];
+      if (a.face === b.face) {
+        a.card.classList.add('got');
+        b.card.classList.add('got');
+        sfx.good();
+        pairs += 1;
+        api.progress(pairs, 6);
+        if (pairs === 6) api.after(600, api.win);
+      } else {
+        busy = true;
+        api.after(800, () => { a.card.classList.remove('up'); b.card.classList.remove('up'); busy = false; });
+      }
+    };
+    grid.append(card);
+  });
+  area.append(grid);
+}
+
+// 3. Copy the Colors — repeat a growing pattern.
+function simonLevel(area, api) {
+  const target = 5;
+  const PADS = [
+    { color: '#ff5d73', emoji: '\u{1F353}', f: 330 },
+    { color: '#ffd23f', emoji: '\u{1F34B}', f: 392 },
+    { color: '#4d8dff', emoji: '\u{1FAD0}', f: 494 },
+    { color: '#3cc977', emoji: '\u{1F34F}', f: 587 },
+  ];
+  const seq = [randi(0, 3)];
+  let pos = 0;
+  let listening = false;
+  const pads = PADS.map((p, i) => h('button.pad', { style: { background: p.color }, onclick: () => press(i) }, p.emoji));
+  const status = h('p.center', { style: { fontSize: '1.2rem', fontWeight: 600, margin: '4px 0 14px' } });
+  area.append(h('div.pads', pads), status);
+  api.goal(`Watch the fruits light up, then tap them in the same order. Get to ${target} in a row!`);
+  api.progress(0, target);
+  const flash = (i, ms = 420) => {
+    pads[i].classList.add('lit');
+    tone(PADS[i].f, ms * 0.9, 'triangle', 0.18);
+    api.after(ms, () => pads[i].classList.remove('lit'));
+  };
+  const play = () => {
+    listening = false;
+    pos = 0;
+    status.textContent = '\u{1F440} Watch…';
+    seq.forEach((p, k) => api.after(700 + k * 650, () => flash(p)));
+    api.after(700 + seq.length * 650, () => { listening = true; status.textContent = '\u{1F449} Your turn!'; });
+  };
+  function press(i) {
+    if (!listening) return;
+    flash(i, 250);
+    if (i !== seq[pos]) {
+      listening = false;
+      sfx.bad();
+      status.textContent = 'Oops! Watch again \u{1F648}';
+      wiggle(area);
+      api.after(900, play);
+      return;
+    }
+    pos += 1;
+    if (pos === seq.length) {
+      listening = false;
+      api.progress(seq.length, target);
+      if (seq.length >= target) { status.textContent = 'Perfect! \u{1F31F}'; api.after(700, api.win); return; }
+      status.textContent = 'Yes! \u{1F389}';
+      seq.push(randi(0, 3));
+      api.after(700, play);
+    }
+  }
+  play();
+}
+
+// 4. Puppy Maze — guide the puppy to the cake.
+function mazeLevel(area, api) {
+  const W = 7;
+  const H = 8;
+  // Depth-first maze: every cell is reachable, so it's always solvable.
+  const cells = Array.from({ length: W * H }, () => ({ t: 1, r: 1, b: 1, l: 1, seen: false }));
+  const at = (x, y) => cells[y * W + x];
+  const stack = [[0, 0]];
+  at(0, 0).seen = true;
+  while (stack.length) {
+    const [x, y] = stack[stack.length - 1];
+    const nbrs = [[0, -1, 't', 'b'], [1, 0, 'r', 'l'], [0, 1, 'b', 't'], [-1, 0, 'l', 'r']]
+      .map(([dx, dy, w, o]) => [x + dx, y + dy, w, o])
+      .filter(([nx, ny]) => nx >= 0 && ny >= 0 && nx < W && ny < H && !at(nx, ny).seen);
+    if (!nbrs.length) { stack.pop(); continue; }
+    const [nx, ny, w, o] = pick(nbrs);
+    at(x, y)[w] = 0;
+    at(nx, ny)[o] = 0;
+    at(nx, ny).seen = true;
+    stack.push([nx, ny]);
+  }
+  let px = 0;
+  let py = 0;
+  const goalX = W - 1;
+  const goalY = H - 1;
+  const grid = h('div.maze', { style: { gridTemplateColumns: `repeat(${W}, 1fr)`, width: `min(100%, 400px, calc((100vh - 430px) * ${W / H}))` } });
+  const els = cells.map((c) => h('div.cell', { class: ['t', 'r', 'b', 'l'].filter((k) => c[k]).join(' ') }));
+  els.forEach((e) => grid.append(e));
+  const paint = () => {
+    els.forEach((e, i) => { if (e.textContent && i !== goalY * W + goalX) e.textContent = ''; });
+    els[goalY * W + goalX].textContent = '\u{1F382}';
+    els[py * W + px].textContent = '\u{1F436}';
+    els[py * W + px].classList.add('trail');
+  };
+  const move = (dx, dy, wall) => {
+    if (at(px, py)[wall]) { sfx.bad(); wiggle(els[py * W + px]); return; }
+    px += dx; py += dy;
+    tone(520 + (px + py) * 20, 60, 'triangle', 0.08);
+    paint();
+    api.progress(px + py, goalX + goalY);
+    if (px === goalX && py === goalY) { els[py * W + px].textContent = '\u{1F973}'; api.after(500, api.win); }
+  };
+  const dirs = { up: [0, -1, 't'], right: [1, 0, 'r'], down: [0, 1, 'b'], left: [-1, 0, 'l'] };
+  const btn = (d, label, col, row) => h('button', { style: { gridColumn: col, gridRow: row }, onclick: () => move(...dirs[d]) }, label);
+  area.style.padding = '8px';
+  area.append(grid, h('div.dpad', btn('up', '⬆️', 2, 1), btn('left', '⬅️', 1, 2), btn('down', '⬇️', 2, 2), btn('right', '➡️', 3, 2)));
+  // Swipes on the maze and arrow keys work too.
+  let sx = null; let sy = null;
+  grid.addEventListener('pointerdown', (e) => { sx = e.clientX; sy = e.clientY; });
+  grid.addEventListener('pointerup', (e) => {
+    if (sx == null) return;
+    const dx = e.clientX - sx; const dy = e.clientY - sy;
+    sx = null;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 20) return;
+    if (Math.abs(dx) > Math.abs(dy)) move(...dirs[dx > 0 ? 'right' : 'left']); else move(...dirs[dy > 0 ? 'down' : 'up']);
+  });
+  const onKey = (e) => {
+    const d = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' }[e.key];
+    if (d && api.alive) { e.preventDefault(); move(...dirs[d]); }
+  };
+  addEventListener('keydown', onKey);
+  const stop = stopLevel;
+  stopLevel = () => { removeEventListener('keydown', onKey); stop(); };
+  api.goal('Help the puppy get to the birthday cake! Use the arrows or swipe.');
+  api.progress(0, 1);
+  paint();
+}
+
+// 5. Word Scramble — tap the letters in the right order.
+function wordLevel(area, api) {
+  const words = [['CAKE', '\u{1F382}'], ['PARTY', '\u{1F973}'], ['MANNY', '\u{1F31F}']];
+  let w = 0;
+  api.goal('Tap the letters in the right order to spell the birthday word!');
+  const show = () => {
+    api.progress(w, words.length);
+    const [word, hint] = words[w];
+    let letters;
+    do { letters = shuffle([...word]); } while (letters.join('') === word);
+    let typed = [];
+    const slots = [...word].map(() => h('div.lslot'));
+    const tiles = letters.map((ch) => h('button.ltile', ch));
+    const paint = () => slots.forEach((s, k) => { s.textContent = typed[k] ? typed[k].ch : ''; s.classList.toggle('full', !!typed[k]); });
+    tiles.forEach((t, k) => (t.onclick = () => {
+      typed.push({ ch: letters[k], k });
+      t.disabled = true;
+      sfx.pop();
+      paint();
+      if (typed.length < word.length) return;
+      if (typed.map((x) => x.ch).join('') === word) {
+        sfx.good();
+        w += 1;
+        api.after(500, () => (w >= words.length ? (api.progress(1, 1), api.win()) : show()));
+      } else {
+        sfx.bad();
+        wiggle(slotRow);
+        api.after(600, () => { typed = []; tiles.forEach((x) => (x.disabled = false)); paint(); });
+      }
+    }));
+    const slotRow = h('div.slots', slots);
+    const undo = h('button.big-btn.alt', { style: { fontSize: '1rem', padding: '8px 18px' }, onclick: () => { const last = typed.pop(); if (last) { tiles[last.k].disabled = false; paint(); } } }, '↩️ Undo');
+    area.replaceChildren(h('div', { style: { padding: '16px' } },
+      h('div.hint', hint),
+      h('p.center', { style: { margin: '4px 0', color: 'var(--muted)' } }, w === words.length - 1 ? 'Last one: whose birthday is it? \u{1F609}' : `Word ${w + 1} of ${words.length}`),
+      slotRow, h('div.tiles', tiles), h('p.center', undo)));
+  };
+  show();
+}
+
+// 6. Birthday Math — easy sums; the last answer is always 9.
+function mathLevel(area, api) {
+  const need = 6;
+  let n = 0;
+  const treats = ['\u{1F9C1}', '\u{1F388}', '\u{1F381}', '\u{1F36D}', '\u{1F370}', '\u{1F36A}'];
+  api.goal(`Solve ${need} birthday math problems!`);
+  const ask = () => {
+    api.progress(n, need);
+    let a; let b; let op; let ans;
+    if (n === need - 1) { a = randi(2, 7); b = 9 - a; op = '+'; ans = 9; } // the birthday number!
+    else if (Math.random() < 0.6) { a = randi(1, 10); b = randi(1, 10); op = '+'; ans = a + b; }
+    else { a = randi(5, 18); b = randi(1, a - 1); op = '−'; ans = a - b; }
+    const opts = new Set([ans]);
+    while (opts.size < 3) { const v = ans + pick([-3, -2, -1, 1, 2, 3]); if (v >= 0) opts.add(v); }
+    const t = pick(treats);
+    const buttons = shuffle([...opts]).map((v) => h('button', {
+      onclick: (e) => {
+        if (v !== ans) { sfx.bad(); wiggle(e.currentTarget); return; }
+        e.currentTarget.classList.add('right');
+        sfx.good();
+        n += 1;
+        api.after(450, () => (n >= need ? (api.progress(1, 1), api.win()) : ask()));
+      },
+    }, v));
+    fill(area,
+      h('div.sum', `${t} ${a} ${op} ${b} = ?`),
+      n === need - 1 ? h('p.center', { style: { margin: 0, color: 'var(--muted)' } }, 'Hint: it’s a very special number today! \u{1F382}') : null,
+      h('div.answers', buttons),
+    );
+  };
+  ask();
+}
+
+// 7. Catch the Treats — move the basket, catch 9 treats, dodge the broccoli.
+function catchLevel(area, api) {
+  const need = 9;
+  let got = 0;
+  let bx = 50; // basket x in %
+  api.goal(`Catch ${need} treats in the basket! Watch out for broccoli \u{1F966}`);
+  api.progress(0, need);
+  Object.assign(area.style, { height: '60vh', background: 'linear-gradient(#fff3d6, #ffe0f0)' });
+  const basket = h('div.basket', '\u{1F9FA}');
+  area.append(basket);
+  const place = () => (basket.style.left = bx + '%');
+  place();
+  const moveTo = (clientX) => {
+    const r = area.getBoundingClientRect();
+    bx = Math.max(6, Math.min(94, ((clientX - r.left) / r.width) * 100));
+    place();
+  };
+  area.addEventListener('pointerdown', (e) => { moveTo(e.clientX); area.setPointerCapture(e.pointerId); });
+  area.addEventListener('pointermove', (e) => { if (e.buttons || e.pointerType === 'touch') moveTo(e.clientX); });
+  const onKey = (e) => {
+    if (!api.alive) return;
+    if (e.key === 'ArrowLeft') { bx = Math.max(6, bx - 7); place(); }
+    if (e.key === 'ArrowRight') { bx = Math.min(94, bx + 7); place(); }
+  };
+  addEventListener('keydown', onKey);
+  const stop = stopLevel;
+  stopLevel = () => { removeEventListener('keydown', onKey); stop(); };
+  const items = [];
+  api.every(850, () => {
+    const bad = Math.random() < 0.25;
+    const el = h('div.item', bad ? '\u{1F966}' : pick(['\u{1F9C1}', '\u{1F369}', '\u{1F36D}', '\u{1F370}', '\u{1F36A}', '\u{1F36C}']));
+    const it = { el, x: rand(8, 92), y: -6, v: rand(16, 24), bad };
+    el.style.left = it.x + '%';
+    area.append(el);
+    items.push(it);
+  });
+  const pop = (text, x, color) => {
+    const f = h('div.float', { style: { left: x + '%', top: '78%', color } }, text);
+    area.append(f);
+    f.animate([{ transform: 'translate(-50%,-50%)', opacity: 1 }, { transform: 'translate(-50%,-180%)', opacity: 0 }], 700).onfinish = () => f.remove();
+  };
+  api.frame((dt) => {
+    for (let i = items.length - 1; i >= 0; i--) {
+      const it = items[i];
+      it.y += (it.v * dt) / 1000;
+      it.el.style.top = it.y + '%';
+      if (it.y >= 84 && it.y <= 92 && Math.abs(it.x - bx) < 11) {
+        it.el.remove(); items.splice(i, 1);
+        if (it.bad) { sfx.bad(); got = Math.max(0, got - 1); pop('\u{1F966} oops!', bx, '#2f8a3a'); }
+        else { sfx.good(); got += 1; pop('+1', bx, '#ff5d9e'); }
+        api.progress(got, need);
+        if (got >= need) { api.win(); return; }
+      } else if (it.y > 105) { it.el.remove(); items.splice(i, 1); }
+    }
+  });
+}
+
+// 8. Bubble Count — tap 1 to 9 in order (round 2: the bubbles drift!).
+function bubbleLevel(area, api) {
+  let round = 1;
+  api.goal('Tap the bubbles in order: 1, 2, 3… all the way to 9!');
+  Object.assign(area.style, { height: '58vh', background: 'linear-gradient(#d9f1ff, #f3fbff)' });
+  const start = () => {
+    area.replaceChildren(h('div', { style: { position: 'absolute', top: '8px', left: 0, right: 0, textAlign: 'center', fontWeight: 700, color: 'var(--muted)' } }, round === 1 ? 'Round 1 of 2' : 'Round 2: they’re floating! \u{1F32C}️'));
+    let next = 1;
+    // Spread the bubbles out on a jittered 3x3 grid.
+    const spots = shuffle([...Array(9).keys()]).map((c) => ({ x: 18 + (c % 3) * 32 + rand(-7, 7), y: 22 + Math.floor(c / 3) * 28 + rand(-6, 6) }));
+    for (let n = 1; n <= 9; n++) {
+      const { x, y } = spots[n - 1];
+      const b = h('button.bubble', { style: { left: x + '%', top: y + '%' } }, n);
+      if (round === 2) b.animate([{ transform: 'translate(-50%,-50%)' }, { transform: `translate(calc(-50% + ${rand(-40, 40)}px), calc(-50% + ${rand(-30, 30)}px))` }], { duration: rand(1800, 2800), iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' });
+      b.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        if (n !== next) { sfx.bad(); wiggle(b); return; }
+        tone(300 + n * 70, 110, 'triangle', 0.15);
+        b.getAnimations().forEach((a) => a.cancel());
+        b.classList.add('gone');
+        b.disabled = true;
+        next += 1;
+        api.progress((round - 1) * 9 + n, 18);
+        if (next > 9) api.after(400, () => (round === 2 ? api.win() : (round = 2, start())));
+      });
+      area.append(b);
+    }
+  };
+  api.progress(0, 18);
+  start();
+}
+
+// 9. Photo Puzzle — swap tiles to fix the picture.
+function puzzleLevel(area, api) {
+  const COLS = 3;
+  const ROWS = 4;
+  const N = COLS * ROWS;
+  let order;
+  do { order = shuffle([...Array(N).keys()]); } while (order.filter((v, i) => v === i).length > 2);
+  let sel = null;
+  api.goal('Tap two pieces to swap them. Put the picture back together!');
+  const grid = h('div.puzzle');
+  const tiles = order.map(() => h('button.ptile'));
+  const paint = () => {
+    let right = 0;
+    tiles.forEach((t, pos) => {
+      const piece = order[pos];
+      t.style.backgroundPosition = `${(piece % COLS) * 50}% ${Math.floor(piece / COLS) * (100 / 3)}%`;
+      t.classList.toggle('ok', piece === pos);
+      t.classList.toggle('sel', sel === pos);
+      if (piece === pos) right += 1;
+    });
+    api.progress(right, N);
+    return right === N;
+  };
+  tiles.forEach((t, pos) => {
+    t.onclick = () => {
+      if (sel === null) { sel = pos; sfx.pop(); paint(); return; }
+      if (sel === pos) { sel = null; paint(); return; }
+      [order[sel], order[pos]] = [order[pos], order[sel]];
+      sel = null;
+      const solved = paint();
+      if (order[pos] === pos) sfx.good(); else sfx.pop();
+      if (solved) {
+        grid.classList.add('solved');
+        tiles.forEach((x) => (x.disabled = true));
+        api.after(1200, api.win);
+      }
+    };
+    grid.append(t);
+  });
+  const peek = h('img.peek.hidden', { src: 'manny.jpg', alt: 'The finished picture' });
+  area.style.padding = '8px';
+  area.append(grid, h('p.center', { style: { margin: '4px 0 10px' } },
+    h('button.big-btn.alt', { style: { fontSize: '1rem', padding: '8px 18px' }, onpointerdown: () => peek.classList.remove('hidden'), onpointerup: () => peek.classList.add('hidden'), onpointerleave: () => peek.classList.add('hidden') }, '\u{1F440} Hold to peek')),
+    h('p.center', { style: { margin: 0 } }, peek));
+  paint();
+}
+
+home();
+</script>
+</body>
+</html>
