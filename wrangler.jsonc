@@ -2,6 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   // The worker name becomes the URL: https://<name>.<your-account>.workers.dev
   "name": "guess",
+  "account_id": "ca137ae942b964de04a24d0b41bfe52f",
   "main": "worker/index.js",
   "compatibility_date": "2025-10-01",
   "assets": {
