@@ -5,11 +5,8 @@
   "account_id": "ca137ae942b964de04a24d0b41bfe52f",
   "main": "worker/index.js",
   "compatibility_date": "2025-10-01",
-  "assets": {
-    "directory": "./public",
-    "binding": "ASSETS",
-    "run_worker_first": ["/api/*", "/ws/*", "/qr.svg"]
-  },
+  // The web pages in public/ are packed into the Worker before each build.
+  "build": { "command": "node scripts/bundle-pages.js", "watch_dir": "public" },
   "durable_objects": {
     "bindings": [{ "name": "ROOMS", "class_name": "GameRoom" }]
   },

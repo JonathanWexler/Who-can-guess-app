@@ -58,21 +58,25 @@ There are also **60 act-off prompts** in `src/actprompts.js`.
 
 ## Running it
 
+**Live:** https://guess.jwexman.workers.dev (open `/host` on the TV and scan the QR code)
+
+It runs on Cloudflare Workers, with one Durable Object per room holding the game state.
+
 ```bash
 npm install
-npm start        # prints the host URL and the address phones should use
+npm start        # local copy at http://localhost:8787 (wrangler dev)
 npm test
+npm run deploy   # publish to Cloudflare (needs a Workers API token)
 ```
 
-Phones must be on the same Wi-Fi as the computer running the game. The QR code
-automatically uses this computer's network address instead of `localhost`. If you host it
-somewhere else (or behind a tunnel), set `PUBLIC_URL`, e.g.
-`PUBLIC_URL=https://my-game.example.com npm start`, and the QR code will use that.
+To publish under a different name, change `"name"` in `wrangler.jsonc`.
 
 ## Project layout
 
 ```
-src/server.js       Express + Socket.IO, room codes, QR code endpoint
+worker/index.js     Cloudflare Worker: pages, room codes, QR codes, GameRoom Durable Object
+public/socket.js    Small WebSocket client used by the TV and phone pages
+scripts/bundle-pages.js  Packs public/ into the Worker at build time
 src/room.js         Game flow: lobby → question → answer → … → act-off → vote → results → final
 src/questions.js    The 50 questions: each makes a random answer + data for the animation
 src/actprompts.js   Act-off prompts

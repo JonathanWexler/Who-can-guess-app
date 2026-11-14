@@ -3,7 +3,7 @@
 //   /api/new-room   → picks a free 4-letter room code
 //   /ws/<CODE>      → WebSocket into that room's Durable Object
 //   /qr.svg?url=…   → QR code for the join link
-//   everything else → static files in /public (host.html, play.html, …)
+//   everything else → the pages in /public, bundled into the Worker as text
 //
 // Each room is one Durable Object (GameRoom) holding the same Room state
 // machine the tests exercise (src/room.js), so all players in a room talk to
@@ -12,6 +12,7 @@
 import { Room } from '../src/room.js';
 import { create as createQR } from 'qrcode/lib/core/qrcode.js';
 import { render as renderSvg } from 'qrcode/lib/renderer/svg-tag.js';
+import { PAGES } from './pages.generated.js';
 
 // No vowels or look-alike characters, so codes never spell anything or get misread.
 const CODE_CHARS = 'BCDFGHJKLMNPQRSTVWXZ';
@@ -48,7 +49,9 @@ export default {
       return new Response(svg, { headers: { 'content-type': 'image/svg+xml', 'cache-control': 'public, max-age=3600' } });
     }
 
-    return env.ASSETS.fetch(request);
+    const page = PAGES[url.pathname];
+    if (page) return new Response(page[0], { headers: { 'content-type': page[1], 'cache-control': 'no-cache' } });
+    return new Response('Not found', { status: 404 });
   },
 };
 
