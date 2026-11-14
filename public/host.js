@@ -60,7 +60,7 @@ function newRoom() {
 function render() {
   const q = state.question;
   const a = state.actoff;
-  const key = JSON.stringify([state.phase, q && q.id, state.progress && state.progress.question, a && a.actors, a && a.prompt, state.phase === 'lobby' ? [state.players.map((p) => [p.id, p.connected]), state.settings, joinBase] : null, state.phase === 'final' ? state.players : null]);
+  const key = JSON.stringify([state.phase, q && q.id, state.progress && state.progress.question, a && a.actors, a && a.prompt, state.phase === 'lobby' ? [state.players.map((p) => [p.id, p.connected]), state.settings, joinBase, state.leaderId] : null, state.phase === 'final' ? state.players : null]);
   if (key !== current.key) {
     const view = { lobby: lobbyView, question: questionView, answer: answerView, actoff: actoffView, voting: votingView, 'actoff-result': actoffResultView, final: finalView }[state.phase]();
     current = { key, update: view.update || null };
@@ -84,6 +84,7 @@ function edgeLine(ids) {
 function lobbyView() {
   const s = state.settings;
   const url = joinUrl();
+  const leader = state.players.find((p) => p.id === state.leaderId);
   const opt = (label, active, onclick) => h('button.btn.small', { class: active ? '' : 'secondary', onclick }, label);
   const el = h('div.stack',
     h('div.row', h('h1.logo', 'Who Can ', h('span', 'Guess?')), h('div.spacer'), h('button.btn.secondary.small', { onclick: newRoom }, 'New room')),
@@ -99,14 +100,17 @@ function lobbyView() {
           ),
         ),
         h('h3', state.players.length ? `${state.players.length} player${state.players.length === 1 ? '' : 's'} in` : 'Waiting for players…'),
+        h('p.muted', { style: { margin: 0 } }, leader
+          ? ['\u{1F451} ', h('strong', leader.name), ' is the host — start the game from your phone!']
+          : '\u{1F451} The first person to scan is the host and runs the game from their phone.'),
         h('div.chips', { style: { justifyContent: 'center' } },
-          state.players.map((p) => h('button.chip', { class: p.connected ? '' : 'off', title: 'Click to remove', onclick: () => confirm(`Remove ${p.name}?`) && emit('host:kick', { playerId: p.id }) }, swatch(p.color), p.name))),
+          state.players.map((p) => h('button.chip', { class: p.connected ? '' : 'off', title: 'Click to remove', onclick: () => confirm(`Remove ${p.name}?`) && emit('host:kick', { playerId: p.id }) }, swatch(p.color), p.id === state.leaderId ? '\u{1F451} ' : '', p.name))),
         h('div.settings-row', h('span.muted', 'Questions between act-offs:'),
           [3, 4].map((n) => opt(n, s.perSet === n, () => emit('host:configure', { perSet: n })))),
         h('div.settings-row', h('span.muted', 'Rounds:'),
           [2, 3, 4, 5].map((n) => opt(n, s.sets === n, () => emit('host:configure', { sets: n })))),
         h('p.muted', { style: { margin: 0 } }, `${s.perSet * s.sets} picture questions + ${s.sets} act-offs`),
-        h('button.btn', { disabled: state.players.length < 1, onclick: () => emit('host:start') }, '▶ Start game'),
+        h('button.btn.secondary.small', { disabled: state.players.length < 1, onclick: () => emit('host:start') }, '▶ Start from this screen'),
       ),
       h('section.card',
         h('h3', 'How to play'),

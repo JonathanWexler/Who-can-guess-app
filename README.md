@@ -7,9 +7,14 @@ random players get up for an **act-off**, and everyone else votes for who did it
 
 ## How a game goes
 
-1. Open **`/host`** on a TV or laptop. It shows a **QR code** and a 4-letter room code.
-2. Everyone scans the QR code (or opens `/play`) on their phone and types their name.
-3. The host picks **3 or 4 questions between act-offs** and **2–5 rounds**, then hits Start.
+1. Open **https://whocanguess.pages.dev** on a TV or laptop. That's it: a room is created and
+   its **QR code** shows up right away.
+2. Everyone scans the QR code with their phone and types their name. The TV shows each name
+   as people join.
+3. **The first person to scan is the host 👑.** They play like everyone else, and their phone also
+   has the host controls: pick 3 or 4 questions between act-offs and 2–5 rounds, then **Start**.
+   They also tap **Next**, **Done acting** and **Play again** during the game. If the host's phone
+   is gone for 30 seconds, the crown passes to the next player.
 4. **Picture question:** the big screen shows a title card, then the animation. Phones show
    the question and a number keypad or answer buttons. There's a 20-second answer window
    after the animation, and you get **one locked-in guess**.
@@ -58,7 +63,7 @@ There are also **60 act-off prompts** in `src/actprompts.js`.
 
 ## Running it
 
-**Live:** https://whocanguess.pages.dev (open `/host` on the TV and scan the QR code)
+**Live:** https://whocanguess.pages.dev (open it on the TV and scan the QR code)
 Also at https://guess.jwexman.workers.dev — both addresses share the same game and rooms.
 
 It runs on Cloudflare Workers, with one Durable Object per room holding the game state.

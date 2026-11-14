@@ -90,18 +90,22 @@ function render() {
     state.phase, state.progress && state.progress.question, q && q.locked, q && q.result,
     a && [a.actors, a.prompt, a.yourVote, a.result], state.you.edge, state.you.score,
     state.phase === 'lobby' || state.phase === 'final' ? state.players.map((p) => [p.name, p.score]) : null,
+    state.leaderId === state.you.id, state.phase === 'lobby' ? state.settings : null,
   ]);
   if (key === renderedKey) return;
   renderedKey = key;
   const view = { lobby: lobbyView, question: questionView, answer: answerView, actoff: actoffView, voting: votingView, 'actoff-result': actoffResultView, final: finalView }[state.phase];
-  app.replaceChildren(youBar(), view());
+  const controls = hostControls();
+  // In the lobby the host's Start button goes first so it's never below the fold.
+  if (controls && state.phase === 'lobby') app.replaceChildren(youBar(), controls, view());
+  else app.replaceChildren(youBar(), view(), controls || '');
 }
 
 function youBar() {
   const me = state.you;
   return h('div.you-bar',
     swatch(me.color),
-    h('span.name', me.name, ' ', me.edge ? edgeBadge() : null),
+    h('span.name', state.leaderId === me.id ? '\u{1F451} ' : '', me.name, ' ', me.edge ? edgeBadge() : null),
     h('strong', me.score.toLocaleString(), ' pts'),
   );
 }
@@ -113,7 +117,9 @@ function lobbyView() {
   return h('div.stack.center',
     h('div.card.stack',
       h('h2', 'You’re in! \u{1F389}'),
-      h('p.muted', 'Room ', h('strong', state.code), ' · waiting for the host to start…'),
+      state.leaderId === state.you.id
+        ? h('p', '\u{1F451} ', h('strong', 'You\u2019re the host!'), ' Pick the settings below and start when everyone\u2019s in.')
+        : h('p.muted', 'Room ', h('strong', state.code), ` \u00b7 waiting for \u{1F451} ${nameOf(state.leaderId)} to start\u2026`),
       h('div.chips', { style: { justifyContent: 'center' } }, state.players.map((p) => h('span.chip', swatch(p.color), p.name))),
     ),
     h('div.card', { style: { textAlign: 'left' } },
@@ -293,6 +299,60 @@ function finalView() {
     h('div.result-big', me.score.toLocaleString(), ' pts'),
     h('p.muted', `${me.correct} question${me.correct === 1 ? '' : 's'} right`),
     h('div.card', { style: { textAlign: 'left' } }, h('ol.standings', state.players.map((p, i) => h('li', h('span.rank', i + 1), swatch(p.color), h('span.name', p.name), h('span.score', p.score.toLocaleString()))))),
-    h('p.muted', 'The host can start another game.'),
+    state.leaderId === me.id ? null : h('p.muted', 'The host can start another game.'),
   );
+}
+
+// ---- host controls (first player to join runs the game from their phone) --
+
+function hostControls() {
+  if (state.leaderId !== state.you.id) return null;
+  const go = async (event, payload) => {
+    const res = await emit(event, payload);
+    if (res.error) alert(res.error);
+  };
+  const btn = (label, event, opts = {}) => h('button.btn' + (opts.secondary ? '.secondary' : '') + (opts.small ? '.small' : '') + (opts.block ? '.block' : ''), { onclick: () => go(event, opts.payload) }, label);
+  const p = state.progress;
+  let body;
+  switch (state.phase) {
+    case 'lobby': {
+      const s = state.settings;
+      const opt = (label, active, payload) => h('button.btn.small', { class: active ? '' : 'secondary', onclick: () => go('host:configure', payload) }, label);
+      body = [
+        h('div.settings-row', h('span.muted', 'Questions per act-off:'), [3, 4].map((n) => opt(n, s.perSet === n, { perSet: n }))),
+        h('div.settings-row', h('span.muted', 'Rounds:'), [2, 3, 4, 5].map((n) => opt(n, s.sets === n, { sets: n }))),
+        h('p.muted', { style: { margin: 0 } }, `${s.perSet * s.sets} questions + ${s.sets} act-offs \u00b7 ${state.players.length} player${state.players.length === 1 ? '' : 's'} in`),
+        btn('\u25B6 Start game', 'host:start', { block: true }),
+      ];
+      break;
+    }
+    case 'question':
+      body = [btn('End this question now', 'host:next', { secondary: true, small: true })];
+      break;
+    case 'answer': {
+      const endOfSet = p.question % p.perSet === 0;
+      const last = p.question >= p.total;
+      const willActOff = endOfSet && state.players.filter((x) => x.connected).length >= 3;
+      body = [btn(willActOff ? '\u{1F3AD} Act-off time!' : last ? '\u{1F3C6} Final results' : 'Next question \u25B6', 'host:next', { block: true })];
+      break;
+    }
+    case 'actoff':
+      body = [
+        h('div.row', { style: { justifyContent: 'center' } }, btn('\u{1F500} Different actors', 'host:reroll-actors', { secondary: true, small: true }), btn('\u{1F3B2} Different prompt', 'host:reroll-prompt', { secondary: true, small: true })),
+        btn('\u2705 Done acting \u2014 vote!', 'host:next', { block: true }),
+      ];
+      break;
+    case 'voting':
+      body = [btn('Close voting', 'host:next', { secondary: true, block: true })];
+      break;
+    case 'actoff-result':
+      body = [btn(p.question >= p.total ? '\u{1F3C6} Final results' : 'Next round \u25B6', 'host:next', { block: true })];
+      break;
+    case 'final':
+      body = [btn('Play again', 'host:start', { block: true }), btn('Back to lobby', 'host:lobby', { secondary: true, block: true })];
+      break;
+    default:
+      return null;
+  }
+  return h('div.card.host-controls.stack', { style: state.phase === 'lobby' ? { marginTop: 0, marginBottom: '16px' } : {} }, h('div.round-tag', '\u{1F451} Host controls'), body);
 }

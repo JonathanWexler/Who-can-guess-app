@@ -153,7 +153,9 @@ export class GameRoom {
     }
 
     if (event.startsWith('host:')) {
-      if (!room || conn.role !== 'host') return { error: 'Only the host can do that.' };
+      // The TV screen, or the host player (first to join) from their phone.
+      const allowed = conn.role === 'host' || (conn.role === 'player' && room?.canControl(conn.playerId));
+      if (!room || !allowed) return { error: 'Only the host can do that.' };
       switch (event) {
         case 'host:configure': room.configure(payload); return {};
         case 'host:start': return room.start();

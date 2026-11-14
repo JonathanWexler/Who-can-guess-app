@@ -35,6 +35,8 @@ class Room {
     this.usedQuestions = new Set();
     this.usedPrompts = new Set();
     this.timer = null;
+    this.leaderId = null; // the first player to join runs the game from their phone
+    this.leaderTimer = null;
     this.lastActivity = this.now();
   }
 
@@ -46,6 +48,7 @@ class Room {
     if (existing) {
       existing.socketId = socketId;
       existing.connected = true;
+      if (existing.id === this.leaderId) this.clearLeaderTimer();
       this.broadcast();
       return { player: existing };
     }
@@ -67,6 +70,7 @@ class Room {
       connected: true,
     };
     this.players.set(player.id, player);
+    if (!this.leaderId) this.leaderId = player.id;
     this.broadcast();
     return { player };
   }
@@ -75,6 +79,7 @@ class Room {
     const p = this.players.get(playerId);
     if (!p) return;
     this.players.delete(playerId);
+    if (playerId === this.leaderId) this.passLeadership();
     if (p.socketId) this.emitTo(p.socketId, 'kicked', {});
     if (this.question) this.question.guesses.delete(playerId);
     if (this.actoff) {
@@ -94,10 +99,35 @@ class Room {
       if (p.socketId === socketId) {
         p.connected = false;
         p.socketId = null;
+        // Give the host's phone 30s to come back (screen lock, flaky Wi-Fi) before passing the crown.
+        if (p.id === this.leaderId && !this.leaderTimer) {
+          this.leaderTimer = this.timers.setTimeout(() => {
+            this.leaderTimer = null;
+            const leader = this.players.get(this.leaderId);
+            if (!leader || !leader.connected) this.passLeadership();
+          }, 30000);
+        }
       }
     }
     this.broadcast();
     this.checkEveryoneDone();
+  }
+
+  passLeadership() {
+    this.clearLeaderTimer();
+    const next = this.connectedPlayers()[0] || [...this.players.values()][0];
+    this.leaderId = next ? next.id : null;
+    this.broadcast();
+  }
+
+  clearLeaderTimer() {
+    if (this.leaderTimer) this.timers.clearTimeout(this.leaderTimer);
+    this.leaderTimer = null;
+  }
+
+  // The TV screen or the host player's phone can run the game.
+  canControl(playerId) {
+    return !!playerId && playerId === this.leaderId;
   }
 
   connectedPlayers() {
@@ -322,6 +352,7 @@ class Room {
 
   destroy() {
     this.clearTimer();
+    this.clearLeaderTimer();
   }
 
   // ---- views -------------------------------------------------------------
@@ -343,6 +374,7 @@ class Room {
       phase: this.phase,
       settings: this.settings,
       players: this.playerList(),
+      leaderId: this.leaderId,
       progress: total ? { question: this.qIndex + 1, total, set: this.setNumber(), sets: this.settings.sets, perSet: this.settings.perSet } : null,
     };
   }

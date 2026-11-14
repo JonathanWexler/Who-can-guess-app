@@ -147,3 +147,29 @@ test('rerolling actors picks different people when possible', () => {
   room.rerollActors();
   assert.ok(room.actoff.actors.every((id) => !before.includes(id)));
 });
+
+test('the first player to join is the host; the crown passes on if they leave', () => {
+  const { room, join, lastFor } = makeRoom();
+  const [a, b] = join('A', 'B');
+  assert.equal(room.leaderId, a.id);
+  assert.ok(room.canControl(a.id));
+  assert.ok(!room.canControl(b.id));
+  assert.equal(lastFor('s-B').leaderId, a.id);
+  room.kick(a.id);
+  assert.equal(room.leaderId, b.id);
+});
+
+test('a host whose phone drops gets 30s to come back before the crown moves', () => {
+  const { room, join, pending } = makeRoom();
+  const [a, b] = join('A', 'B');
+  room.disconnectSocket('s-A');
+  assert.equal(room.leaderId, a.id);
+  const t = pending.find((x) => x.ms === 30000);
+  room.join({ playerId: a.id, socketId: 's-A2' }); // back in time
+  assert.ok(!pending.includes(t));
+  assert.equal(room.leaderId, a.id);
+
+  room.disconnectSocket('s-A2');
+  pending.find((x) => x.ms === 30000).fn(); // stays away
+  assert.equal(room.leaderId, b.id);
+});
