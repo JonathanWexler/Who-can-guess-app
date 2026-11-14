@@ -118,7 +118,7 @@ function lobbyView() {
           h('li', h('strong', 'Picture questions: '), 'watch the big screen — balloons popping, someone blinking, fireworks… then pick one of 4 answers on your phone.'),
           h('li', h('strong', 'One tap only! '), 'No take-backs. Your phone tells you privately if you got it.'),
           h('li', h('strong', '\u{1F3AD} Act-offs: '), `after every ${s.perSet} questions, two random players act something out. Everyone else votes for who did it better.`),
-          h('li', h('strong', '\u{1F608} Sabotage: '), 'once per round, send an evil smiley to someone\u2019s phone. It bounces over their answers until they tap it 3 times!'),
+          h('li', h('strong', '\u{1F608} Sabotage: '), 'you get 2 per round \u2014 send an evil smiley to someone\u2019s phone. It bounces over their answers until they tap it 3 times!'),
           h('li', h('strong', { style: { color: 'var(--edge)' } }, '⚡ The EDGE: '), 'win an act-off and you get a slight advantage for the next round — one wrong answer gets crossed out on your phone.'),
         ),
         h('p.muted', { style: { marginTop: '12px', fontSize: '.9rem' } }, '1,000 pts per right answer · 1,500 for winning an act-off · 500 for being brave. Scores are revealed after each act-off.'),

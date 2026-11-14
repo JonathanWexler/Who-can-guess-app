@@ -28,13 +28,14 @@ random players get up for an **act-off**, and everyone else votes for who did it
 
 ### 😈 Sabotage
 
-Once per round (between act-offs), every player can sabotage someone during a question:
+Every player gets **2 sabotages per round** (between act-offs) to use during questions:
 
 - Tap **😈 Sabotage someone** on your phone and pick a player who hasn't answered yet.
 - An evil smiley bounces over their answer buttons until they **tap it 3 times** (it jumps
   after every tap). It clears itself after 10 seconds so nobody is locked out completely.
 - The TV shows "😈 Leo sabotaged Maya!". Each player can only be hit once per question,
-  and you can't sabotage yourself. Unused sabotages don't carry over.
+  and you can't sabotage yourself. You can use both on one question (on two different
+  people) or spread them out. Unused sabotages don't carry over.
 
 ### Points
 

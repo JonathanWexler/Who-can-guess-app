@@ -7,7 +7,7 @@ const MAX_PLAYERS = 16;
 const CARD_MS = 3000; // title card on the big screen before the animation starts
 const ANSWER_MS = 20000; // time to answer once the animation has played
 const MIN_ACTOFF_PLAYERS = 3; // two actors + at least one voter
-const SABOTAGES_PER_ROUND = 1; // evil smileys each player can send between act-offs
+const SABOTAGES_PER_ROUND = 2; // evil smileys each player can send between act-offs
 
 // Phases:
 //   lobby → question → answer → (repeat) → actoff → voting → actoff-result → … → final

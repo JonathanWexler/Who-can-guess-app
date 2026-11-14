@@ -130,7 +130,7 @@ function lobbyView() {
         h('li', '\u{1F440} Watch the big screen, then answer here.'),
         h('li', '☝️ Pick one of 4 answers, and no take-backs!'),
         h('li', '\u{1F3AD} You might get picked to act something out!'),
-        h('li', '\u{1F608} Once a round, sabotage someone with an evil smiley that blocks their answers!'),
+        h('li', '\u{1F608} You get 2 sabotages a round: send someone an evil smiley that blocks their answers!'),
         h('li', h('strong', { style: { color: 'var(--edge)' } }, '⚡ Win an act-off'), ' to get the EDGE for the next round.'),
       ),
     ),
@@ -372,7 +372,7 @@ let pickerOpenFor = null;
 function sabotagePanel() {
   const n = state.progress.question;
   const left = state.you.sabotages;
-  if (left <= 0) return h('p.muted.center', { style: { fontSize: '.85rem', marginTop: '14px' } }, '\u{1F608} Sabotage used — you get another one next round.');
+  if (left <= 0) return h('p.muted.center', { style: { fontSize: '.85rem', marginTop: '14px' } }, '\u{1F608} Both sabotages used — you get 2 more next round.');
   const msg = h('p.error', { style: { margin: 0 } });
   const list = h('div.chips', { style: { justifyContent: 'center' } });
   const fill = () => {
