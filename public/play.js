@@ -3,7 +3,6 @@ const app = document.getElementById('app');
 let state = null;
 let renderedKey = null;
 let joinError = '';
-const roundEndsAt = {};
 
 function emit(event, payload = {}) {
   return new Promise((resolve) => socket.emit(event, payload, (res) => resolve(res || {})));
@@ -15,7 +14,9 @@ const params = new URLSearchParams(location.search);
 const saved = store.get('wcg-player'); // { code, playerId, name }
 
 socket.on('connect', async () => {
-  if (saved && saved.playerId) {
+  // A QR code for a different room wins over a saved seat.
+  const urlCode = (params.get('code') || '').toUpperCase();
+  if (saved && saved.playerId && (!urlCode || urlCode === saved.code)) {
     const res = await emit('player:join', saved);
     if (!res.error) return;
     store.del('wcg-player');
@@ -70,15 +71,16 @@ async function leave() {
 // ---- rendering -------------------------------------------------------------
 
 function render() {
-  const r = state.round;
-  const yr = state.yourRound || {};
+  const q = state.question;
+  const a = state.actoff;
   const key = JSON.stringify([
-    state.phase, r && r.number, yr.submitted, yr.hasEdge, state.you.edge,
+    state.phase, state.progress && state.progress.question, q && q.locked, q && q.result,
+    a && [a.actors, a.prompt, a.yourVote, a.result], state.you.edge, state.you.score,
     state.phase === 'lobby' || state.phase === 'final' ? state.players.map((p) => [p.name, p.score]) : null,
   ]);
   if (key === renderedKey) return;
   renderedKey = key;
-  const view = { lobby: lobbyView, intro: introView, playing: playingView, reveal: revealView, final: finalView }[state.phase];
+  const view = { lobby: lobbyView, question: questionView, answer: answerView, actoff: actoffView, voting: votingView, 'actoff-result': actoffResultView, final: finalView }[state.phase];
   app.replaceChildren(youBar(), view());
 }
 
@@ -91,6 +93,9 @@ function youBar() {
   );
 }
 
+const nameOf = (id) => (state.players.find((p) => p.id === id) || {}).name || '?';
+const colorOf = (id) => (state.players.find((p) => p.id === id) || {}).color || '#fff';
+
 function lobbyView() {
   return h('div.stack.center',
     h('div.card.stack',
@@ -101,211 +106,167 @@ function lobbyView() {
     h('div.card', { style: { textAlign: 'left' } },
       h('h3', 'Quick rules'),
       h('ul.how',
-        h('li', 'Each round is a different mini guessing game on your phone.'),
-        h('li', 'Closest guess wins the most points.'),
-        h('li', h('strong', { style: { color: 'var(--edge)' } }, '⚡ Win a round to earn the EDGE'), ' — a slight advantage next round.'),
+        h('li', '\u{1F440} Watch the big screen, then answer here.'),
+        h('li', '☝️ One guess only, and it has to be exactly right.'),
+        h('li', '\u{1F3AD} You might get picked to act something out!'),
+        h('li', h('strong', { style: { color: 'var(--edge)' } }, '⚡ Win an act-off'), ' to get the EDGE for the next round.'),
       ),
     ),
     h('button.btn.secondary.small', { onclick: leave }, 'Leave'),
   );
 }
 
-function edgeBox(game, hasEdge) {
-  if (!hasEdge) return null;
-  return h('div.edge-banner.pop', h('strong', '⚡ You have the EDGE! '), game.edgeText);
-}
-
-function introView() {
-  const r = state.round;
-  return h('div.stack.center.pop',
-    h('div.round-tag', `Round ${r.number} of ${r.total}`),
-    h('div.big-emoji', r.game.emoji),
-    h('h1', r.game.title),
-    h('p', { style: { fontSize: '1.2rem' } }, r.game.instructions),
-    edgeBox(r.game, state.yourRound && state.yourRound.hasEdge),
-    h('p.muted', 'Get ready…'),
-  );
-}
-
-function timerBar(r) {
-  if (!roundEndsAt[r.number]) roundEndsAt[r.number] = { at: Date.now() + (r.endsInMs ?? 0), total: r.endsInMs || 1 };
-  const t = roundEndsAt[r.number];
+function timerBar() {
+  const q = state.question;
   const el = h('div.mini-timer', h('div'));
-  startCountdown(el, t.at, { total: t.total });
+  startCountdown(el, Date.now() + q.endsInMs, { total: q.durationMs });
   return el;
 }
 
-function playingView() {
-  const r = state.round;
-  const yr = state.yourRound;
-  if (yr.submitted) {
+function questionHeader(q) {
+  return h('div.stack',
+    h('div.row', h('span.round-tag', `Question ${state.progress.question} of ${state.progress.total}`), h('div.spacer'), q.hasEdge ? edgeBadge() : null),
+    h('h2', { style: { margin: 0 } }, `${q.emoji} ${q.title}`),
+    h('p.question', { style: { margin: 0 } }, q.prompt),
+  );
+}
+
+function optionContent(o) {
+  return [
+    o.color ? h('span.swatch-lg', { style: { background: o.color } }) : null,
+    o.emoji ? h('span.em', o.emoji) : null,
+    o.label ? h('span', o.label) : null,
+  ];
+}
+
+function questionView() {
+  const q = state.question;
+  if (q.locked) {
+    const shown = q.kind === 'choice' ? h('div.option-row', h('span.option-pill', optionContent(q.options[q.guess]))) : h('strong', formatNum(q.guess));
     return h('div.stack.center.pop',
-      h('div.card.locked', 'Locked in:', h('strong', withUnit(yr.guess, r.game.input.unit))),
-      h('p.muted', 'Waiting for everyone else…'),
-      timerBar(r),
+      questionHeader(q),
+      h('div.card.locked', '\u{1F512} Locked in:', shown),
+      h('p.muted', 'No take-backs! Wait for the reveal…'),
+      timerBar(),
     );
   }
-  const stim = yr.stimulus;
-  const body = h('div.stack');
-  const container = h('div.stack',
-    h('div.row', h('strong', `${r.game.emoji} ${r.game.title}`), h('div.spacer'), yr.hasEdge ? edgeBadge() : null),
-    body,
-    timerBar(r),
-  );
-
-  if (stim.type === 'stopwatch') {
-    body.append(stopwatchGame(stim, r.game));
-  } else if (stim.type === 'clues' || stim.type === 'question') {
-    body.append(...[
-      stim.question ? h('p.question', stim.question) : null,
-      ...(stim.clues || []).map((c) => h('div.clue', { class: c.startsWith('EDGE') ? 'edge' : '' }, c)),
-      stim.hint ? h('div.clue.edge', stim.hint) : null,
-      guessInput(r.game),
-    ].filter(Boolean));
-  } else {
-    // Peek games: "get ready", flash the stimulus, then hide it and ask.
-    const stage = h('div.stage', h('div.msg', 'Get ready…'));
-    body.append(stage);
-    runPeek(stage, stim).then(() => {
-      if (!stage.isConnected) return;
-      stage.replaceChildren(h('div.msg', '\u{1F914} What did you see?'));
-      stage.style.aspectRatio = 'auto';
-      stage.style.minHeight = '90px';
-      body.append(guessInput(r.game));
-    });
-  }
-  return container;
-}
-
-const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
-
-async function runPeek(stage, stim) {
-  await sleep(1200);
-  if (stim.type === 'dots') {
-    stage.replaceChildren(s('svg', { viewBox: '0 0 100 100' }, stim.dots.map((d) => s('circle', { cx: d.x, cy: d.y, r: d.r, fill: d.c }))));
-    await sleep(stim.showMs);
-  } else if (stim.type === 'bar') {
-    stage.replaceChildren(h('div.barbox', h('div.barfill', { style: { width: stim.percent + '%' } })));
-    await sleep(stim.showMs);
-  } else if (stim.type === 'angle') {
-    stage.replaceChildren(angleSvg(stim));
-    await sleep(stim.showMs);
-  } else if (stim.type === 'blinks') {
-    const lamp = h('div.lamp');
-    stage.replaceChildren(lamp);
-    await sleep(400);
-    for (let i = 0; i < stim.count; i++) {
-      lamp.classList.add('on');
-      await sleep(stim.intervalMs);
-      lamp.classList.remove('on');
-      await sleep(stim.intervalMs);
-    }
-    await sleep(200);
-  }
-}
-
-function angleSvg(stim) {
-  const cx = 50, cy = 75, R = 42;
-  const rad = (stim.degrees * Math.PI) / 180;
-  const parts = [
-    s('line', { x1: 4, y1: cy, x2: 96, y2: cy, stroke: '#6a63a8', 'stroke-width': 1.5 }),
-    s('path', { d: `M ${cx - R} ${cy} A ${R} ${R} 0 0 1 ${cx + R} ${cy}`, fill: 'none', stroke: '#3a3370', 'stroke-width': 1 }),
-  ];
-  if (stim.ticks) {
-    for (let a = 0; a <= 180; a += 15) {
-      const t = (a * Math.PI) / 180;
-      const inner = a % 45 === 0 ? R - 6 : R - 3;
-      parts.push(s('line', { x1: cx + Math.cos(t) * inner, y1: cy - Math.sin(t) * inner, x2: cx + Math.cos(t) * R, y2: cy - Math.sin(t) * R, stroke: '#5ce1e6', 'stroke-width': a % 45 === 0 ? 1.2 : 0.7 }));
-    }
-  }
-  parts.push(
-    s('line', { x1: cx, y1: cy, x2: cx + Math.cos(rad) * R, y2: cy - Math.sin(rad) * R, stroke: '#ffd23f', 'stroke-width': 3, 'stroke-linecap': 'round' }),
-    s('circle', { cx, cy, r: 2.5, fill: '#ffd23f' }),
-  );
-  return s('svg', { viewBox: '0 0 100 100' }, parts);
-}
-
-function guessInput(game) {
-  const { kind, min, max, step, unit } = game.input;
   const err = h('p.error');
-  let input, getValue, field;
-  if (kind === 'slider') {
-    const mid = Math.round((min + max) / 2);
-    const display = h('div.slider-value', withUnit(mid, unit));
-    input = h('input', { type: 'range', min, max, step, value: mid, oninput: () => { display.textContent = withUnit(Number(input.value), unit); } });
-    getValue = () => Number(input.value);
-    field = h('div', display, input);
-  } else {
-    input = h('input', { type: 'number', inputmode: 'numeric', min, max, step, placeholder: unit ? `Your guess (${unit})` : 'Your guess', enterkeyhint: 'done' });
-    getValue = () => (input.value === '' ? NaN : Number(input.value));
-    field = input;
-  }
-  const btn = h('button.btn.block', { type: 'submit' }, 'Lock it in \u{1F512}');
-  const form = h('form.stack.pop', {
-    onsubmit: async (e) => {
-      e.preventDefault();
-      const v = getValue();
-      if (!Number.isFinite(v)) { err.textContent = 'Enter a number first.'; return; }
-      btn.disabled = true;
-      const res = await emit('player:guess', { value: v });
-      if (res.error) { err.textContent = res.error; btn.disabled = false; }
-    },
-  }, field, btn, err);
-  if (kind !== 'slider') setTimeout(() => input.focus(), 50);
-  return form;
-}
-
-function stopwatchGame(stim) {
-  const face = h('div.stopwatch-face', '0.00');
-  const btn = h('button.btn.block', 'START');
-  let startedAt = null;
-  let raf = null;
-  const tick = () => {
-    const elapsed = Date.now() - startedAt;
-    face.textContent = elapsed < stim.visibleMs ? (elapsed / 1000).toFixed(2) : '??.??';
-    raf = requestAnimationFrame(tick);
+  const send = async (value) => {
+    const res = await emit('player:guess', { value });
+    if (res.error) err.textContent = res.error;
   };
-  btn.addEventListener('click', async () => {
-    if (startedAt == null) {
-      startedAt = Date.now();
-      btn.textContent = 'STOP';
-      btn.style.background = 'var(--bad)';
-      tick();
-    } else {
-      cancelAnimationFrame(raf);
-      const elapsed = Math.round((Date.now() - startedAt) / 10) / 100;
-      face.textContent = elapsed.toFixed(2);
-      btn.disabled = true;
-      await emit('player:guess', { value: elapsed });
-    }
-  });
-  return h('div.stack.center',
-    h('p.target', 'Stop at exactly ', h('strong', stim.target.toFixed(1) + 's')),
-    h('div.stage', { style: { aspectRatio: 'auto', minHeight: '140px' } }, face),
-    btn,
+  let input;
+  if (q.kind === 'choice') {
+    input = h('div.choices', q.options.map((o, i) => {
+      const crossed = q.removed === i;
+      return h('button.choice-btn', {
+        class: crossed ? 'crossed' : '',
+        disabled: crossed,
+        onclick: (e) => {
+          e.currentTarget.parentNode.querySelectorAll('button').forEach((b) => (b.disabled = true));
+          e.currentTarget.classList.add('sel');
+          send(i);
+        },
+      }, optionContent(o));
+    }));
+  } else {
+    input = keypad(send);
+  }
+  return h('div.stack',
+    questionHeader(q),
+    h('p.watch', '\u{1F440} Watch the big screen! You only get ONE guess.'),
+    q.hasEdge ? h('div.edge-banner', h('strong', '⚡ EDGE: '), q.kind === 'choice' ? 'one wrong answer is crossed out for you.' : 'if you’re off by just 1, it still counts!') : null,
+    input,
+    err,
+    timerBar(),
   );
 }
 
-function revealView() {
-  const r = state.round;
-  const me = state.you;
-  const idx = r.results.findIndex((x) => x.id === me.id);
-  const res = r.results[idx];
-  const unit = r.game.input.unit;
-  const earned = r.edgeEarners.includes(me.id);
+function keypad(onSubmit) {
+  let value = '';
+  const display = h('div.keypad-display', ' ');
+  const lock = h('button.btn.block', { disabled: true, onclick: () => { lock.disabled = true; onSubmit(Number(value)); } }, 'Lock it in \u{1F512}');
+  const press = (k) => {
+    if (k === '⌫') value = value.slice(0, -1);
+    else if (k === 'C') value = '';
+    else if (value.length < 6) value = (value === '0' ? '' : value) + k;
+    display.textContent = value || ' ';
+    lock.disabled = value === '';
+  };
+  const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'];
+  return h('div.stack', display, h('div.keypad', keys.map((k) => h('button', { type: 'button', onclick: () => press(k) }, k))), lock);
+}
+
+function answerView() {
+  const q = state.question;
+  const r = q.result;
+  const answerShown = q.kind === 'choice' ? h('div.option-row', h('span.option-pill.right', optionContent(q.options[q.answer]))) : h('div.answer', formatNum(q.answer));
+  const yours = r.guess == null ? 'You didn’t answer in time.' : q.kind === 'choice' ? ['You picked ', h('span.option-pill', { style: { fontSize: '1rem', padding: '4px 10px' } }, optionContent(q.options[r.guess]))] : ['You said ', h('strong', formatNum(r.guess))];
+  const edgeSaved = r.correct && q.kind === 'number' && r.guess !== q.answer;
   return h('div.stack.center.pop',
-    h('div.round-tag', `Round ${r.number} of ${r.total}`),
-    r.revealText ? h('p', r.revealText) : null,
-    h('div.muted', 'Answer'),
-    h('div.answer', withUnit(r.answer, unit)),
-    res ? h('div.card.stack',
-      h('div', 'You guessed ', h('strong', withUnit(res.guess, unit))),
-      h('div.result-big', '+' + res.points.toLocaleString()),
-      h('div.muted', res.exact ? '\u{1F3AF} BULL’S-EYE!' : res.winner ? '\u{1F947} Closest guess!' : `#${idx + 1} of ${r.results.length} this round`),
-    ) : null,
-    earned && !r.isLast ? h('div.edge-banner.pop', h('strong', '⚡ You earned the EDGE! '), 'You’ll get a slight advantage next round.') : null,
-    res && res.hadEdge ? h('p.muted', 'You used your EDGE this round — it moves on to someone else now.') : null,
-    h('p.muted', 'Watch the big screen for the scores…'),
+    h('div.verdict', r.correct ? '✅' : '❌'),
+    h('h1', r.correct ? 'You got it!' : r.guess == null ? 'Too slow!' : 'Not quite!'),
+    r.correct ? h('div.result-big', '+' + r.points.toLocaleString()) : null,
+    edgeSaved ? h('div.edge-banner', h('strong', '⚡ Your EDGE saved you!'), ' Off by one still counts.') : null,
+    h('div.card.stack', h('div.muted', 'The answer was'), answerShown, h('div', yours)),
+    h('p.muted', '\u{1F92B} Only you can see this.'),
+  );
+}
+
+function actoffView() {
+  const a = state.actoff;
+  if (a.youAreActor) {
+    const partner = a.actors.find((id) => id !== state.you.id);
+    return h('div.stack.center.pop',
+      h('div.big-emoji', '\u{1F3AD}'),
+      h('h1', 'You’re on stage!'),
+      h('p', 'You and ', h('strong', { style: { color: colorOf(partner) } }, nameOf(partner)), ' both act out:'),
+      h('div.act-prompt', `“${a.prompt}”`),
+      h('p.muted', 'Take turns. No time limit, so go big! Win the vote for 1,500 pts and the ⚡ EDGE.'),
+    );
+  }
+  return h('div.stack.center.pop',
+    h('div.big-emoji', '\u{1F37F}'),
+    h('h1', 'Act-off!'),
+    h('p', h('strong', { style: { color: colorOf(a.actors[0]) } }, nameOf(a.actors[0])), ' vs ', h('strong', { style: { color: colorOf(a.actors[1]) } }, nameOf(a.actors[1]))),
+    h('div.act-prompt', `“${a.prompt}”`),
+    h('p.muted', 'Watch them both. Voting opens when they’re done!'),
+  );
+}
+
+function votingView() {
+  const a = state.actoff;
+  if (a.youAreActor) {
+    return h('div.stack.center.pop', h('div.big-emoji', '\u{1F91E}'), h('h1', 'Everyone’s voting…'), h('p.muted', 'Fingers crossed!'));
+  }
+  const err = h('p.error');
+  return h('div.stack.center.pop',
+    h('h1', '\u{1F5F3}️ Who did it better?'),
+    h('div.act-prompt', { style: { fontSize: '1.3rem' } }, `“${a.prompt}”`),
+    a.actors.map((id) => h('button.vote-btn', {
+      class: a.yourVote === id ? 'sel' : '',
+      style: { '--c': colorOf(id) },
+      onclick: async () => { const res = await emit('player:vote', { actorId: id }); if (res.error) err.textContent = res.error; },
+    }, nameOf(id))),
+    a.yourVote ? h('p.muted', 'Vote counted! You can change it until voting closes.') : h('p.muted', 'Tap one.'),
+    err,
+  );
+}
+
+function actoffResultView() {
+  const r = state.actoff.result;
+  const me = state.you.id;
+  const tie = r.winners.length === 2;
+  const actor = state.actoff.actors.includes(me);
+  const won = r.winners.includes(me);
+  const place = state.players.findIndex((p) => p.id === me) + 1;
+  return h('div.stack.center.pop',
+    h('div.big-emoji', actor ? (won ? (tie ? '\u{1F91D}' : '\u{1F451}') : '\u{1F44F}') : '\u{1F3AD}'),
+    h('h1', actor ? (tie ? 'It’s a tie!' : won ? 'You won the act-off!' : 'So brave!') : tie ? 'It’s a tie!' : `${nameOf(r.winners[0])} wins!`),
+    actor ? h('div.result-big', '+' + r.points[me].toLocaleString()) : null,
+    state.you.edge ? h('div.edge-banner', h('strong', '⚡ You have the EDGE'), ' for the next round!') : null,
+    h('div.card', h('p', { style: { margin: 0 } }, `You’re in `, h('strong', `#${place}`), ` with ${state.you.score.toLocaleString()} pts`)),
+    h('p.muted', 'Check the big screen for the scoreboard!'),
   );
 }
 
@@ -317,6 +278,7 @@ function finalView() {
     h('div.big-emoji', medal),
     h('h1', place === 1 ? 'You win!' : `You placed #${place}`),
     h('div.result-big', me.score.toLocaleString(), ' pts'),
+    h('p.muted', `${me.correct} question${me.correct === 1 ? '' : 's'} right`),
     h('div.card', { style: { textAlign: 'left' } }, h('ol.standings', state.players.map((p, i) => h('li', h('span.rank', i + 1), swatch(p.color), h('span.name', p.name), h('span.score', p.score.toLocaleString()))))),
     h('p.muted', 'The host can start another game.'),
   );

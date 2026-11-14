@@ -1,67 +1,91 @@
 # Who Can Guess?
 
-A party game of quick **mini guessing games**. Everyone plays every round on their own phone,
-the closest guess scores the most, and the best guesser each round **earns the ⚡ EDGE**:
-a slight advantage in the next round.
+A party game for kids (7–15) and grown-ups. A big screen plays quick animated
+**picture questions**: count the balloons before they pop, count the blinks, spot the
+pink snowflakes. Everyone gets **one guess** on their phone. Every few questions, two
+random players get up for an **act-off**, and everyone else votes for who did it better.
 
-## How it plays
+## How a game goes
 
-1. Open **`/host`** on a TV or laptop everyone can see. It shows a 4-letter room code.
-2. Everyone opens **`/play`** on their phone and joins with the code and a name.
-3. The host picks the number of rounds and hits **Start**.
-4. Each round is a random mini-game. Everyone guesses at the same time on their phone.
-5. The TV reveals the answer, everyone's guesses and the points, then shows who earned the EDGE.
+1. Open **`/host`** on a TV or laptop. It shows a **QR code** and a 4-letter room code.
+2. Everyone scans the QR code (or opens `/play`) on their phone and types their name.
+3. The host picks **3 or 4 questions between act-offs** and **2–5 rounds**, then hits Start.
+4. **Picture question:** the big screen shows a title card, then the animation. Phones show
+   the question and a number keypad or answer buttons. There's a 20-second answer window
+   after the animation, and you get **one locked-in guess**.
+   - The big screen only shows **who has answered**, never who was right.
+   - Each phone privately shows ✅ or ❌ and the correct answer.
+5. **Act-off** (after every 3–4 questions): two random players come up and act out the same
+   silly prompt ("A penguin who is late for school"). There's **no time limit**. The host taps
+   *Done acting*, and everyone else votes on their phone. The host can reroll the actors or
+   the prompt.
+6. Scores are revealed after each act-off, then the next round starts.
 
-### Mini-games
+### Points
 
-| Game | What you do | What the ⚡ EDGE gives you |
-| --- | --- | --- |
-| 🔴 Dot Flash | Count dots flashed on screen | 3s look instead of 1.5s |
-| 📊 Fill Level | Guess how full a bar was | Longer look at the bar |
-| 📐 Angle Eye | Guess the angle of a flashed line | Longer look, plus tick marks |
-| ⏱️ Blind Stopwatch | Stop a clock at a target time after it goes blank | Clock stays visible longer |
-| 💡 Blink Count | Count a fast-blinking light | Slower blinks |
-| 🔢 Mystery Number | Guess 1–100 from a clue | A second, sharper clue |
-| 🎯 Ballpark | Estimate a trivia answer | A hint range containing the answer |
+| | |
+|---|---|
+| Right answer (exact) | 1,000 |
+| Win an act-off | 1,500 |
+| Lose an act-off (for being brave) | 500 |
+| Tied act-off | 1,000 each |
 
-### Scoring
+### ⚡ The EDGE
 
-- Up to **1,000 pts** for closeness (scaled to each game's tolerance).
-- **+250** for the closest guess of the round (it has to be within range).
-- **+250** more for a bull's-eye.
+Winning an act-off earns a slight advantage for the **next round of questions**:
 
-### The EDGE
+- On number questions, being **off by one still counts** as right.
+- On multiple-choice questions, **one wrong answer is crossed out** on your phone.
 
-- After each round, the best finisher earns the EDGE for the next round
-  (1 player with 3–5 players, 2 players with 6+; ties at the cutoff all earn it).
-- If you **used** the EDGE this round you can't earn it again right away. It goes to the
-  best player who played without it, so it keeps moving around the room.
-- Head-to-head (2-player) games have no EDGE.
+## The 50 picture questions
+
+All visuals are drawn live with CSS, SVG and emoji. No photos are downloaded, so there's
+nothing to license, it works offline, and every question is randomized each time it's played.
+
+**Counting & tracking (37):** Balloon Pop (they pop while you think!), Blink-Off, Counting
+Sheep (goats don't count), Candy Jar, Super Bouncy Ball, Fish Tank, Fireworks Show, Shooting
+Stars, Duck Parade, Popcorn Party, Hoppy Frog, Cookie Monster Munch, Pink Snow, Apple
+Picker, Ladybug Spots, Domino Topple, Choo-Choo Count, Elevator Ride, The Bus Stop, Tally
+Flash, Treasure Chest, Dice Roll, Cup Pyramid, Pop-Up Hamsters, UFO Farm Visit, Ant Picnic,
+Lights Out, Tricky Colors, Traffic Light Chaos, Spot the Difference, Balance Scale, Number
+Rain, Dino Pizza Party, Countdown Glitch, Odd One Out, Card Memory, Shape Storm.
+
+**Multiple choice (13):** Shell Game, Photo Finish, Mystery Shadow, Super Zoom, What's
+Missing?, Paint Mixer, Eye Tricks (optical illusions), Quick Clock, What Comes Next?, Who
+Moved?, Emoji Mash-Up, Broken Rainbow, Tower Race.
+
+There are also **60 act-off prompts** in `src/actprompts.js`.
 
 ## Running it
 
 ```bash
 npm install
-npm start          # http://localhost:3000
+npm start        # prints the host URL and the address phones should use
 npm test
 ```
 
-Players need to reach the host machine. On a home network, use the host computer's LAN IP
-(e.g. `http://192.168.1.20:3000/play`). Set `PORT` to change the port.
+Phones must be on the same Wi-Fi as the computer running the game. The QR code
+automatically uses this computer's network address instead of `localhost`. If you host it
+somewhere else (or behind a tunnel), set `PUBLIC_URL`, e.g.
+`PUBLIC_URL=https://my-game.example.com npm start`, and the QR code will use that.
 
 ## Project layout
 
 ```
-src/server.js      Express + Socket.IO server, room codes, socket events
-src/room.js        Room state machine: lobby → intro → playing → reveal → final
-src/minigames.js   The mini-games: each one builds an answer, a normal view and an EDGE view
-src/scoring.js     Points and EDGE-earning rules
-public/            Landing page, host (TV) screen, player (phone) screen
-test/              node:test unit tests
+src/server.js       Express + Socket.IO, room codes, QR code endpoint
+src/room.js         Game flow: lobby → question → answer → … → act-off → vote → results → final
+src/questions.js    The 50 questions: each makes a random answer + data for the animation
+src/actprompts.js   Act-off prompts
+src/scoring.js      Right/wrong checking, act-off scoring, EDGE rules
+public/host.js      Big-screen UI
+public/scenes.js    The 50 big-screen animations
+public/play.js      Phone UI (keypad, choices, voting)
+test/               node:test tests
 ```
 
-### Adding a mini-game
+### Adding a question
 
-Add an entry to `MINIGAMES` in `src/minigames.js` with a `create(rng)` that returns
-`{ answer, tolerance, stimulus, edgeStimulus }`. If it needs a new kind of visual, render it
-in `runPeek()` in `public/play.js`.
+1. Add an entry to `QUESTIONS` in `src/questions.js` with `create(rng)` returning
+   `{ answer, data, watchMs }` (plus `options` for multiple choice).
+2. Add an animation with the same id to `SCENES` in `public/scenes.js`.
+   `npm test` checks that every question has one.

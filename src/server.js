@@ -2,6 +2,8 @@ const path = require('node:path');
 const http = require('node:http');
 const express = require('express');
 const { Server } = require('socket.io');
+const os = require('node:os');
+const QRCode = require('qrcode');
 const { Room } = require('./room');
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -12,6 +14,25 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
+// Where phones should go to join. PUBLIC_URL wins; otherwise the host screen
+// uses its own address, swapping "localhost" for this machine's LAN address.
+function lanAddresses() {
+  return Object.values(os.networkInterfaces())
+    .flat()
+    .filter((i) => i && i.family === 'IPv4' && !i.internal)
+    .map((i) => i.address);
+}
+app.get('/api/info', (_req, res) => {
+  res.json({ publicUrl: process.env.PUBLIC_URL || null, lan: lanAddresses().map((ip) => `http://${ip}:${PORT}`) });
+});
+
+app.get('/qr.svg', async (req, res) => {
+  const url = String(req.query.url || '');
+  if (!/^https?:\/\/[^\s]{1,300}$/.test(url)) return res.status(400).send('Bad url');
+  const svg = await QRCode.toString(url, { type: 'svg', margin: 1, errorCorrectionLevel: 'M', color: { dark: '#14112b', light: '#ffffff' } });
+  res.type('image/svg+xml').set('Cache-Control', 'public, max-age=3600').send(svg);
+});
+
 app.get('/host', (_req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'host.html')));
 app.get('/play', (_req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'play.html')));
 
@@ -63,13 +84,11 @@ io.on('connection', (socket) => {
     room.broadcast();
   });
 
-  socket.on('host:start', hostOnly(({ rounds } = {}, cb) => reply(cb, room.start(rounds))));
-  socket.on('host:next', hostOnly((_p, cb) => {
-    if (room.phase === 'reveal') room.nextRound();
-    else if (room.phase === 'intro') room.beginPlaying();
-    else if (room.phase === 'playing') room.reveal();
-    reply(cb, {});
-  }));
+  socket.on('host:configure', hostOnly((settings = {}, cb) => { room.configure(settings); reply(cb, {}); }));
+  socket.on('host:start', hostOnly((_p, cb) => reply(cb, room.start())));
+  socket.on('host:next', hostOnly((_p, cb) => { room.advance(); reply(cb, {}); }));
+  socket.on('host:reroll-actors', hostOnly((_p, cb) => { room.rerollActors(); reply(cb, {}); }));
+  socket.on('host:reroll-prompt', hostOnly((_p, cb) => { room.rerollPrompt(); reply(cb, {}); }));
   socket.on('host:lobby', hostOnly((_p, cb) => { room.backToLobby(); reply(cb, {}); }));
   socket.on('host:kick', hostOnly(({ playerId: id } = {}, cb) => { room.kick(id); reply(cb, {}); }));
 
@@ -88,6 +107,12 @@ io.on('connection', (socket) => {
     if (!room || role !== 'player') return reply(cb, { error: 'Join a room first.' });
     room.lastActivity = Date.now();
     reply(cb, room.submitGuess(playerId, value));
+  });
+
+  socket.on('player:vote', ({ actorId } = {}, cb) => {
+    if (!room || role !== 'player') return reply(cb, { error: 'Join a room first.' });
+    room.lastActivity = Date.now();
+    reply(cb, room.submitVote(playerId, actorId));
   });
 
   socket.on('player:leave', (_p, cb) => {
@@ -115,5 +140,5 @@ setInterval(() => {
 server.listen(PORT, () => {
   console.log(`Who Can Guess? running at http://localhost:${PORT}`);
   console.log(`  Host screen:  http://localhost:${PORT}/host`);
-  console.log(`  Players join: http://localhost:${PORT}/play`);
+  for (const url of lanAddresses().map((ip) => `http://${ip}:${PORT}`)) console.log(`  Phones join:  ${url}/play`);
 });

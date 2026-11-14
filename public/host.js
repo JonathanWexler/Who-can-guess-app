@@ -1,12 +1,20 @@
 const socket = io();
 const app = document.getElementById('app');
 let state = null;
-let renderedKey = null;
-let roundsChoice = 6;
+let current = { key: null, update: null };
+let joinBase = location.origin;
 
 function emit(event, payload = {}) {
   return new Promise((resolve) => socket.emit(event, payload, (res) => resolve(res || {})));
 }
+
+// Phones can't reach "localhost", so swap in this computer's network address.
+fetch('/api/info').then((r) => r.json()).then((info) => {
+  const local = /^(localhost|127\.|\[?::1\]?$)/.test(location.hostname);
+  joinBase = info.publicUrl || (local && info.lan[0]) || location.origin;
+  current.key = null;
+  if (state) render();
+}).catch(() => {});
 
 socket.on('connect', async () => {
   const saved = store.get('wcg-host');
@@ -23,192 +31,252 @@ socket.on('state', (s) => {
   render();
 });
 
-function joinUrl() {
-  return `${location.origin}/play?code=${state.code}`;
-}
+const joinUrl = () => `${joinBase}/play?code=${state.code}`;
+const byId = () => Object.fromEntries(state.players.map((p) => [p.id, p]));
+const next = () => emit('host:next');
 
 function newRoom() {
   store.del('wcg-host');
   location.reload();
 }
 
-// Re-render the whole screen only when something meaningful changes, so
-// countdown timers and animations aren't reset by every update.
+// Each screen is built once per "key" (phase + question/act-off). Smaller
+// changes (someone answered, someone voted) go through update() so animations
+// on the big screen keep running.
 function render() {
-  const r = state.round;
-  const key = JSON.stringify([state.phase, r && r.number, state.players, r && r.submitted, state.totalRounds]);
-  if (key === renderedKey) return;
-  renderedKey = key;
-  const view = { lobby: lobbyView, intro: introView, playing: playingView, reveal: revealView, final: finalView }[state.phase];
-  app.replaceChildren(view());
+  const q = state.question;
+  const a = state.actoff;
+  const key = JSON.stringify([state.phase, q && q.id, state.progress && state.progress.question, a && a.actors, a && a.prompt, state.phase === 'lobby' ? [state.players.map((p) => [p.id, p.connected]), state.settings, joinBase] : null, state.phase === 'final' ? state.players : null]);
+  if (key !== current.key) {
+    const view = { lobby: lobbyView, question: questionView, answer: answerView, actoff: actoffView, voting: votingView, 'actoff-result': actoffResultView, final: finalView }[state.phase]();
+    current = { key, update: view.update || null };
+    app.replaceChildren(view.el);
+  }
+  if (current.update) current.update(state);
 }
 
-function standingsList(players, { showEdge = true } = {}) {
-  return h('ol.standings', players.map((p, i) =>
-    h('li', { class: p.connected ? '' : 'muted' },
-      h('span.rank', i + 1),
-      swatch(p.color),
-      h('span.name', p.name),
-      showEdge && p.edge ? edgeBadge() : null,
-      h('span.score', p.score.toLocaleString()),
-    )));
+function progressTag() {
+  const p = state.progress;
+  return p ? `Question ${p.question} of ${p.total} · Round ${p.set} of ${p.sets}` : '';
 }
 
-function sidebar() {
-  return h('aside.card',
-    h('h3', 'Scores'),
-    standingsList(state.players),
-    h('p.muted', { style: { marginTop: '12px', fontSize: '.85rem' } }, 'Room ', h('strong', state.code), ' · join at ', location.host + '/play'),
-  );
+function edgeLine(ids) {
+  const names = state.players.filter((p) => ids.includes(p.id)).map((p) => p.name);
+  if (!names.length) return null;
+  return h('div.edge-banner', h('strong', `⚡ ${names.join(' & ')} ${names.length > 1 ? 'have' : 'has'} the EDGE`), ' — off-by-one still counts, and one wrong choice gets crossed out.');
 }
 
+// ---------------------------------------------------------------- lobby
 function lobbyView() {
-  const players = state.players;
-  const roundsOpts = [3, 6, 9, 12];
-  return h('div.stack',
-    h('div.row',
-      h('h1.logo', 'Who Can ', h('span', 'Guess?')),
-      h('div.spacer'),
-      h('button.btn.secondary.small', { onclick: newRoom }, 'New room'),
-    ),
+  const s = state.settings;
+  const url = joinUrl();
+  const opt = (label, active, onclick) => h('button.btn.small', { class: active ? '' : 'secondary', onclick }, label);
+  const el = h('div.stack',
+    h('div.row', h('h1.logo', 'Who Can ', h('span', 'Guess?')), h('div.spacer'), h('button.btn.secondary.small', { onclick: newRoom }, 'New room')),
     h('div.host-grid',
       h('section.card.center.stack',
-        h('p.muted', 'Grab your phone and go to'),
-        h('h2', location.host + '/play'),
-        h('p.muted', 'and enter the room code'),
-        h('div.code', state.code),
-        h('h3', { style: { marginTop: '24px' } }, players.length ? `${players.length} player${players.length === 1 ? '' : 's'} in` : 'Waiting for players…'),
-        h('div.chips', { style: { justifyContent: 'center' } },
-          players.map((p) => h('button.chip', { class: p.connected ? '' : 'off', title: 'Click to remove', onclick: () => confirm(`Remove ${p.name}?`) && emit('host:kick', { playerId: p.id }) }, swatch(p.color), p.name))),
-        h('div.row', { style: { justifyContent: 'center', marginTop: '20px' } },
-          h('span.muted', 'Rounds:'),
-          roundsOpts.map((n) => h('button.btn.small', {
-            class: n === roundsChoice ? '' : 'secondary',
-            onclick: () => { roundsChoice = n; renderedKey = null; render(); },
-          }, n)),
+        h('div.row', { style: { justifyContent: 'center', gap: '28px', alignItems: 'center' } },
+          h('div.qr', h('img', { src: `/qr.svg?url=${encodeURIComponent(url)}`, alt: 'QR code to join' })),
+          h('div.stack', { style: { textAlign: 'left' } },
+            h('p.muted', { style: { margin: 0 } }, '\u{1F4F1} Scan to join, or go to'),
+            h('div.join-url', joinBase.replace(/^https?:\/\//, '') + '/play'),
+            h('p.muted', { style: { margin: 0 } }, 'Room code'),
+            h('div.code', { style: { fontSize: 'clamp(2.5rem, 7vw, 5rem)' } }, state.code),
+          ),
         ),
-        h('button.btn', {
-          disabled: players.length < 1,
-          onclick: () => emit('host:start', { rounds: roundsChoice }),
-        }, '▶ Start game'),
+        h('h3', state.players.length ? `${state.players.length} player${state.players.length === 1 ? '' : 's'} in` : 'Waiting for players…'),
+        h('div.chips', { style: { justifyContent: 'center' } },
+          state.players.map((p) => h('button.chip', { class: p.connected ? '' : 'off', title: 'Click to remove', onclick: () => confirm(`Remove ${p.name}?`) && emit('host:kick', { playerId: p.id }) }, swatch(p.color), p.name))),
+        h('div.settings-row', h('span.muted', 'Questions between act-offs:'),
+          [3, 4].map((n) => opt(n, s.perSet === n, () => emit('host:configure', { perSet: n })))),
+        h('div.settings-row', h('span.muted', 'Rounds:'),
+          [2, 3, 4, 5].map((n) => opt(n, s.sets === n, () => emit('host:configure', { sets: n })))),
+        h('p.muted', { style: { margin: 0 } }, `${s.perSet * s.sets} picture questions + ${s.sets} act-offs`),
+        h('button.btn', { disabled: state.players.length < 1, onclick: () => emit('host:start') }, '▶ Start game'),
       ),
       h('section.card',
         h('h3', 'How to play'),
         h('ol.how',
-          h('li', 'Every round is a different quick mini-game: count flashing dots, stop a hidden stopwatch, eyeball an angle, estimate trivia…'),
-          h('li', 'Everyone guesses on their own phone. Closest guess scores the most (up to 1,000 pts, +250 for closest, +250 more for a bull’s-eye).'),
-          h('li', h('strong', { style: { color: 'var(--edge)' } }, '⚡ The EDGE: '), 'the best guesser(s) each round earn a slight advantage in the next round — a longer look, a slower blink, an extra clue.'),
-          h('li', 'The EDGE can’t be earned two rounds in a row, so it keeps moving around the room.'),
+          h('li', h('strong', 'Picture questions: '), 'watch the big screen — balloons popping, someone blinking, fireworks… then answer on your phone.'),
+          h('li', h('strong', 'One guess only! '), 'It has to be exactly right. Your phone tells you privately if you got it.'),
+          h('li', h('strong', '\u{1F3AD} Act-offs: '), `after every ${s.perSet} questions, two random players act something out. Everyone else votes for who did it better.`),
+          h('li', h('strong', { style: { color: 'var(--edge)' } }, '⚡ The EDGE: '), 'win an act-off and you get a slight advantage for the next round — off-by-one counts as right, and one wrong choice gets crossed out.'),
         ),
-        h('p.muted', { style: { marginTop: '12px', fontSize: '.9rem' } }, 'With 3–5 players, 1 player earns the EDGE each round; with 6+, 2 do. Head-to-head games have no EDGE.'),
+        h('p.muted', { style: { marginTop: '12px', fontSize: '.9rem' } }, '1,000 pts per right answer · 1,500 for winning an act-off · 500 for being brave. Scores are revealed after each act-off.'),
       ),
     ),
   );
+  return { el };
 }
 
-function roundHeader(r) {
-  return h('div.round-tag', `Round ${r.number} of ${r.total}`);
+// ---------------------------------------------------------------- question
+function questionView() {
+  const q = state.question;
+  const stage = h('div.stage16');
+  const ring = h('div.ring', h('span'));
+  const answered = h('div.answered');
+  const promptEl = h('div.q-prompt', `${q.emoji} ${q.prompt}`);
+  const el = h('div',
+    h('div.game-top', h('div', h('div.round-tag', progressTag()), promptEl), ring),
+    stage,
+    answered,
+    h('div.row', { style: { marginTop: '10px' } }, edgeLine(q.edgeHolders), h('div.spacer'), h('button.btn.secondary.small', { onclick: next }, 'End question')),
+  );
+
+  // Title card, then the animation.
+  const card = h('div.s-title', h('div.e', q.emoji), h('div.t', q.title), h('div.p', q.prompt));
+  stage.append(card);
+  setTimeout(() => {
+    if (!stage.isConnected) return;
+    card.remove();
+    playScene(stage, q.id, q.data);
+  }, q.cardMs);
+
+  const endsAt = Date.now() + q.endsInMs;
+  const tick = setInterval(() => {
+    if (!ring.isConnected) return clearInterval(tick);
+    const left = Math.max(0, endsAt - Date.now());
+    ring.firstChild.textContent = Math.ceil(left / 1000);
+    ring.style.setProperty('--p', (left / q.durationMs) * 100 + '%');
+    ring.classList.toggle('low', left < 5000);
+  }, 200);
+
+  return {
+    el,
+    update(s) {
+      const sub = new Set(s.question.submitted);
+      const connected = s.players.filter((p) => p.connected);
+      answered.replaceChildren(
+        h('strong', `${sub.size}/${connected.length} answered`),
+        ...s.players.map((p) => h('span.chip', { class: (sub.has(p.id) ? 'done ' : '') + (p.connected ? '' : 'off') }, swatch(p.color), p.name, sub.has(p.id) ? ' ✔' : '')),
+      );
+    },
+  };
 }
 
-function edgeHoldersLine(r) {
-  const holders = state.players.filter((p) => r.edgeHolders.includes(p.id));
-  if (!holders.length) return null;
-  return h('div.edge-banner',
-    h('strong', '\u26A1 ' + holders.map((p) => p.name).join(' & ') + (holders.length === 1 ? ' has' : ' have') + ' the EDGE: '),
-    r.game.edgeText,
+function optionPill(o, right) {
+  return h('span.option-pill', { class: right ? 'right' : '' }, o.color ? h('span.swatch-lg', { style: { background: o.color } }) : null, o.emoji ? h('span', { style: { fontSize: '1.6em' } }, o.emoji) : null, o.label || null);
+}
+
+function answerView() {
+  const q = state.question;
+  const p = state.progress;
+  const endOfSet = p.question % p.perSet === 0;
+  const last = p.question >= p.total;
+  const connected = state.players.filter((x) => x.connected).length;
+  const willActOff = endOfSet && connected >= 3;
+  const nextLabel = willActOff ? '\u{1F3AD} Act-off time!' : last ? '\u{1F3C6} Final results' : 'Next question ▶';
+  const el = h('section.card.center.stack.pop',
+    h('div.round-tag', progressTag()),
+    h('h2', `${q.emoji} ${q.title}`),
+    h('p', { style: { fontSize: '1.3rem' } }, q.prompt),
+    h('div.muted', 'The answer was'),
+    q.kind === 'choice'
+      ? h('div.option-row', { style: { fontSize: '1.6rem' } }, optionPill(q.options[q.answer], true))
+      : h('div.answer', formatNum(q.answer)),
+    h('p.muted', `${q.answerCount} of ${state.players.length} locked in an answer. Check your phone to see if you got it! \u{1F92B}`),
+    h('div', h('button.btn', { onclick: next }, nextLabel)),
+  );
+  return { el };
+}
+
+// ---------------------------------------------------------------- act-off
+function actorCards(a, { votes } = {}) {
+  const ids = byId();
+  const winners = a.result ? a.result.winners : [];
+  return h('div.vs',
+    h('div.actor-card', { class: winners.length === 1 && winners[0] === a.actors[0] ? 'winner' : '', style: { '--c': ids[a.actors[0]]?.color } }, h('div.nm', ids[a.actors[0]]?.name || '?'), votes ? h('div.votes', votes[0]) : null),
+    h('div.vs-word', 'VS'),
+    h('div.actor-card', { class: winners.length === 1 && winners[0] === a.actors[1] ? 'winner' : '', style: { '--c': ids[a.actors[1]]?.color } }, h('div.nm', ids[a.actors[1]]?.name || '?'), votes ? h('div.votes', votes[1]) : null),
   );
 }
 
-function introView() {
-  const r = state.round;
-  return h('div.host-grid',
+function actoffView() {
+  const a = state.actoff;
+  const el = h('section.card.center.stack.pop',
+    h('div.round-tag', `Act-off ${a.number}`),
+    h('h1.logo', '\u{1F3AD} ACT-', h('span', 'OFF!')),
+    h('p.muted', 'Come on up! You both act out the same thing, one at a time:'),
+    actorCards(a),
+    h('div.act-prompt', `“${a.prompt}”`),
+    h('p.muted', 'No time limit. When you’re both done, everyone votes on their phone for who did it better!'),
+    h('div.row', { style: { justifyContent: 'center' } },
+      h('button.btn.secondary.small', { onclick: () => emit('host:reroll-actors') }, '\u{1F500} Different actors'),
+      h('button.btn.secondary.small', { onclick: () => emit('host:reroll-prompt') }, '\u{1F3B2} Different prompt'),
+    ),
+    h('div', h('button.btn', { onclick: next }, '✅ Done acting — vote!')),
+  );
+  return { el };
+}
+
+function votingView() {
+  const a = state.actoff;
+  const status = h('div');
+  const el = h('section.card.center.stack.pop',
+    h('div.round-tag', `Act-off ${a.number}`),
+    h('h1', '\u{1F5F3}️ Vote on your phones!'),
+    h('div.act-prompt', `“${a.prompt}”`),
+    actorCards(a),
+    status,
+    h('div', h('button.btn.secondary.small', { onclick: next }, 'Close voting')),
+  );
+  return {
+    el,
+    update(s) {
+      const voters = s.players.filter((p) => p.connected && !s.actoff.actors.includes(p.id));
+      const voted = new Set(s.actoff.voted);
+      status.replaceChildren(
+        h('p', h('strong', `${voted.size}/${voters.length} voted`)),
+        h('div.chips', { style: { justifyContent: 'center' } }, voters.map((p) => h('span.chip', { class: voted.has(p.id) ? 'done' : '' }, swatch(p.color), p.name, voted.has(p.id) ? ' ✔' : ''))),
+      );
+    },
+  };
+}
+
+function scoreboard(players) {
+  return h('ol.standings', players.map((p, i) =>
+    h('li', h('span.rank', i + 1), swatch(p.color), h('span.name', p.name), p.edge ? edgeBadge() : null, h('span.score', (p.score || 0).toLocaleString()))));
+}
+
+function actoffResultView() {
+  const a = state.actoff;
+  const r = a.result;
+  const ids = byId();
+  const tie = r.winners.length === 2;
+  const p = state.progress;
+  const last = p.question >= p.total;
+  const el = h('div.host-grid',
     h('section.card.center.stack.pop',
-      roundHeader(r),
-      h('div.big-emoji', r.game.emoji),
-      h('h1', r.game.title),
-      h('p', { style: { fontSize: '1.4rem' } }, r.game.instructions),
-      edgeHoldersLine(r),
-      h('p.muted', 'Get ready… eyes on your phones!'),
-      h('div', h('button.btn.secondary.small', { onclick: () => emit('host:next') }, 'Skip intro')),
+      h('div.round-tag', `Act-off ${a.number} results`),
+      h('h1', tie ? '\u{1F91D} It’s a tie!' : `\u{1F451} ${ids[r.winners[0]]?.name} wins!`),
+      actorCards(a, { votes: a.actors.map((id) => r.tally[id]) }),
+      h('p', a.actors.map((id) => `${ids[id]?.name} +${r.points[id].toLocaleString()}`).join('   ·   ')),
+      !last ? h('div.edge-banner', h('strong', '⚡ EDGE: '), r.winners.map((id) => ids[id]?.name).join(' & '), ' get', r.winners.length === 1 ? 's' : '', ' a slight advantage for the next round of questions!') : null,
+      h('div', h('button.btn', { onclick: next }, last ? '\u{1F3C6} Final results' : 'Next round ▶')),
     ),
-    sidebar(),
+    h('aside.card', h('h3', '\u{1F4CA} Scores'), scoreboard(state.players)),
   );
+  return { el };
 }
 
-function playingView() {
-  const r = state.round;
-  const timer = h('div.timer');
-  startCountdown(timer, Date.now() + (r.endsInMs ?? 0));
-  const connected = state.players.filter((p) => p.connected);
-  return h('div.host-grid',
-    h('section.card.center.stack',
-      roundHeader(r),
-      h('div.row', { style: { justifyContent: 'center' } }, h('span.big-emoji', { style: { fontSize: '3rem' } }, r.game.emoji), h('h1', { style: { margin: 0 } }, r.game.title)),
-      h('h2', '\u{1F4F1} Look at your phones!'),
-      timer,
-      h('p.muted', `${r.submitted.length} of ${connected.length} locked in`),
-      h('div.chips', { style: { justifyContent: 'center' } },
-        state.players.map((p) => h('span.chip', { class: (r.submitted.includes(p.id) ? 'done ' : '') + (p.connected ? '' : 'off') },
-          swatch(p.color), p.name, r.submitted.includes(p.id) ? ' ✔' : '', r.edgeHolders.includes(p.id) ? edgeBadge('') : null))),
-      edgeHoldersLine(r),
-      h('div', h('button.btn.secondary.small', { onclick: () => emit('host:next') }, 'Reveal now')),
-    ),
-    sidebar(),
-  );
-}
-
-function revealView() {
-  const r = state.round;
-  const byId = Object.fromEntries(state.players.map((p) => [p.id, p]));
-  const unit = r.game.input.unit;
-  const earners = r.edgeEarners.map((id) => byId[id]).filter(Boolean);
-  return h('div.host-grid',
-    h('section.card.stack.pop',
-      h('div.center.stack',
-        roundHeader(r),
-        r.revealText ? h('p', { style: { fontSize: '1.3rem' } }, r.revealText) : h('h2', `${r.game.emoji} ${r.game.title}`),
-        h('div.muted', 'The answer was'),
-        h('div.answer', withUnit(r.answer, unit)),
-      ),
-      h('table.results',
-        h('thead', h('tr', h('th', ''), h('th', 'Player'), h('th.num', 'Guess'), h('th.num', 'Off by'), h('th.num', 'Points'))),
-        h('tbody', r.results.map((res, i) => {
-          const p = byId[res.id];
-          if (!p) return null;
-          return h('tr', { class: res.winner ? 'win' : '' },
-            h('td', i + 1),
-            h('td', h('span.row', { style: { gap: '8px', flexWrap: 'nowrap' } }, swatch(p.color), p.name,
-              res.exact ? h('span.tag.gold', 'BULL’S-EYE') : res.winner ? h('span.tag.gold', 'CLOSEST') : null,
-              res.hadEdge ? h('span.tag', '⚡ used edge') : null)),
-            h('td.num', withUnit(res.guess, unit)),
-            h('td.num', res.guess == null ? '—' : formatNum(res.error)),
-            h('td.num', '+' + res.points.toLocaleString()),
-          );
-        })),
-      ),
-      earners.length
-        ? h('div.edge-banner', h('strong', '⚡ EDGE earned: '), earners.map((p) => p.name).join(' & '), r.isLast ? ' (bragging rights only — that was the last round!)' : (earners.length === 1 ? ' gets' : ' get') + ' a slight advantage next round.')
-        : (state.edgeSlots > 0 && !r.isLast ? h('p.muted', 'Nobody earned the EDGE this round.') : null),
-      h('div.center', h('button.btn', { onclick: () => emit('host:next') }, r.isLast ? '\u{1F3C6} Final results' : 'Next round ▶')),
-    ),
-    sidebar(),
-  );
-}
-
+// ---------------------------------------------------------------- final
 function finalView() {
   const ps = state.players;
   const step = (p, cls, place) => p && h('div.step.' + cls, h('div.who', swatch(p.color), ' ', p.name), h('div.muted', p.score.toLocaleString()), h('div.block', place));
-  return h('section.card.center.stack.pop',
+  const sharp = [...ps].sort((a, b) => b.correct - a.correct)[0];
+  const star = [...ps].sort((a, b) => b.actWins - a.actWins)[0];
+  const el = h('section.card.center.stack.pop',
     h('h1.logo', '\u{1F3C6} Final ', h('span', 'Results')),
     h('div.podium', step(ps[1], 'p2', '2'), step(ps[0], 'p1', '1'), step(ps[2], 'p3', '3')),
-    h('div', { style: { maxWidth: '520px', margin: '0 auto', textAlign: 'left' } }, standingsList(ps, { showEdge: false })),
-    (() => {
-      const top = [...ps].sort((a, b) => b.edgesEarned - a.edgesEarned)[0];
-      return top && top.edgesEarned > 0 ? h('p', '⚡ Most EDGEs earned: ', h('strong', top.name), ` (${top.edgesEarned})`) : null;
-    })(),
+    h('div', { style: { maxWidth: '520px', margin: '0 auto', textAlign: 'left' } }, scoreboard(ps)),
     h('div.row', { style: { justifyContent: 'center' } },
-      h('button.btn', { onclick: () => emit('host:start', { rounds: state.totalRounds }) }, 'Play again'),
+      sharp && sharp.correct > 0 ? h('span.option-pill', '\u{1F441}️ Sharpest eyes: ', sharp.name, ` (${sharp.correct} right)`) : null,
+      star && star.actWins > 0 ? h('span.option-pill', '\u{1F3AD} Star actor: ', star.name, ` (${star.actWins} win${star.actWins > 1 ? 's' : ''})`) : null,
+    ),
+    h('div.row', { style: { justifyContent: 'center' } },
+      h('button.btn', { onclick: () => emit('host:start') }, 'Play again'),
       h('button.btn.secondary', { onclick: () => emit('host:lobby') }, 'Back to lobby'),
     ),
   );
+  return { el };
 }

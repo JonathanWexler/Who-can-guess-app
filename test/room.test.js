@@ -11,100 +11,139 @@ function makeRoom() {
   };
   const room = new Room('TEST', { emitTo: (sid, ev, payload) => sent.push({ sid, ev, payload }), timers });
   room.hostSocketId = 'host';
-  const fire = () => { const t = pending.shift(); t.fn(); };
+  const fire = () => pending.shift().fn();
   const lastFor = (sid) => [...sent].reverse().find((m) => m.sid === sid && m.ev === 'state').payload;
-  return { room, sent, pending, fire, lastFor };
+  const join = (...names) => names.map((n) => room.join({ name: n, socketId: 's-' + n }).player);
+  return { room, sent, pending, fire, lastFor, join };
 }
 
-test('players join, names must be unique', () => {
-  const { room } = makeRoom();
-  assert.ok(room.join({ name: 'Ann', socketId: 's1' }).player);
-  assert.match(room.join({ name: 'ann', socketId: 's2' }).error, /taken/);
-  assert.match(room.join({ name: '  ', socketId: 's2' }).error, /name/);
-});
-
-test('rejoining with a playerId reconnects the same player', () => {
-  const { room } = makeRoom();
-  const { player } = room.join({ name: 'Ann', socketId: 's1' });
-  room.disconnectSocket('s1');
-  assert.equal(player.connected, false);
-  const again = room.join({ playerId: player.id, socketId: 's9' });
-  assert.equal(again.player, player);
-  assert.equal(player.connected, true);
+test('names must be unique; rejoin keeps your seat', () => {
+  const { room, join } = makeRoom();
+  const [ann] = join('Ann');
+  assert.match(room.join({ name: 'ann', socketId: 'x' }).error, /taken/);
+  room.disconnectSocket('s-Ann');
+  assert.equal(room.join({ playerId: ann.id, socketId: 'new' }).player, ann);
   assert.equal(room.players.size, 1);
 });
 
-test('full round: intro -> playing -> reveal, edge awarded and shown only to holder', () => {
-  const { room, fire, lastFor } = makeRoom();
-  const a = room.join({ name: 'A', socketId: 'sa' }).player;
-  const b = room.join({ name: 'B', socketId: 'sb' }).player;
-  const c = room.join({ name: 'C', socketId: 'sc' }).player;
-  room.start(3);
-  assert.equal(room.phase, 'intro');
+test('one guess only; exact answers score; phones see only their own result', () => {
+  const { room, join, fire, lastFor } = makeRoom();
+  const [a, b] = join('A', 'B');
+  room.configure({ perSet: 3, sets: 1 });
+  room.start();
+  assert.equal(room.phase, 'question');
+  const q = room.question;
+  const right = q.answer;
+  const wrong = q.template.kind === 'choice' ? (q.answer + 1) % q.options.length : q.answer + 5;
 
-  // The host view never contains the answer or stimulus before the reveal.
-  const hostIntro = JSON.stringify(lastFor('host'));
-  assert.ok(!hostIntro.includes('"answer"'));
+  assert.deepEqual(room.submitGuess(a.id, right), {});
+  assert.match(room.submitGuess(a.id, wrong).error, /already/);
+  room.submitGuess(b.id, wrong);
+  fire(); // everyone answered → reveal
+  assert.equal(room.phase, 'answer');
+  assert.equal(a.score, 1000);
+  assert.equal(b.score, 0);
 
-  fire(); // intro -> playing
-  assert.equal(room.phase, 'playing');
-  assert.ok(lastFor('sa').yourRound.stimulus);
-  assert.ok(!JSON.stringify(lastFor('host')).includes('stimulus'));
-
-  const ans = room.round.answer;
-  room.submitGuess(a.id, ans);
-  room.submitGuess(b.id, ans + 1000);
-  room.submitGuess(c.id, ans + 1000);
-  fire(); // early end after all guessed
-  assert.equal(room.phase, 'reveal');
-  assert.equal(lastFor('host').round.answer, ans);
-  assert.ok(a.score >= 1250);
-  assert.equal(a.edge, true);
-  assert.equal(b.edge, false);
-
-  room.nextRound();
-  fire();
-  const viewA = lastFor('sa');
-  const viewB = lastFor('sb');
-  assert.equal(viewA.yourRound.hasEdge, true);
-  assert.equal(viewB.yourRound.hasEdge, false);
-  assert.deepEqual(viewA.yourRound.stimulus, room.round.edgeStimulus);
-  assert.deepEqual(viewB.yourRound.stimulus, room.round.stimulus);
+  // Phones learn right/wrong privately…
+  assert.equal(lastFor('s-A').question.result.correct, true);
+  assert.equal(lastFor('s-B').question.result.correct, false);
+  // …the big screen never says who was right, and hides scores mid-round.
+  const host = JSON.stringify(lastFor('host'));
+  assert.ok(!host.includes('"correct"'));
+  assert.ok(!host.includes('"score"'));
 });
 
-test('guesses are rejected outside the playing phase and clamped to the input range', () => {
-  const { room, fire } = makeRoom();
-  const a = room.join({ name: 'A', socketId: 'sa' }).player;
-  room.join({ name: 'B', socketId: 'sb' });
-  room.start(1);
-  assert.ok(room.submitGuess(a.id, 5).error);
-  fire();
-  assert.ok(room.submitGuess(a.id, 'abc').error);
-  assert.deepEqual(room.submitGuess(a.id, 1e12), {});
-  const { max = Infinity } = room.round.game.input;
-  assert.ok(room.round.guesses.get(a.id) <= max);
+test('the answer is never sent to anyone before the reveal', () => {
+  const { room, join, lastFor } = makeRoom();
+  join('A');
+  room.start();
+  assert.equal(lastFor('host').question.answer, undefined);
+  assert.equal(lastFor('s-A').question.answer, undefined);
+  assert.equal(lastFor('s-A').question.data, undefined);
 });
 
-test('no edge is handed out after the final round', () => {
-  const { room, fire } = makeRoom();
-  const ps = ['A', 'B', 'C'].map((n, i) => room.join({ name: n, socketId: 's' + i }).player);
-  room.start(1);
-  fire();
-  for (const p of ps) room.submitGuess(p.id, room.round.answer);
-  fire();
-  assert.equal(room.phase, 'reveal');
-  assert.ok(ps.every((p) => !p.edge));
-  room.nextRound();
+test('after a set of questions comes an act-off; votes decide the winner, who gets the EDGE', () => {
+  const { room, join, fire, lastFor } = makeRoom();
+  const ps = join('A', 'B', 'C', 'D');
+  room.configure({ perSet: 3, sets: 2 });
+  room.start();
+  for (let i = 0; i < 3; i++) {
+    assert.equal(room.phase, 'question');
+    room.advance(); // host ends the question
+    assert.equal(room.phase, 'answer');
+    room.advance();
+  }
+  assert.equal(room.phase, 'actoff');
+  const [x, y] = room.actoff.actors;
+  assert.notEqual(x, y);
+  assert.ok(lastFor('s-' + room.players.get(x).name).actoff.youAreActor);
+
+  room.advance(); // done acting → voting
+  assert.equal(room.phase, 'voting');
+  const voters = ps.filter((p) => p.id !== x && p.id !== y);
+  assert.match(room.submitVote(x, y).error, /Actors/);
+  room.submitVote(voters[0].id, x);
+  room.submitVote(voters[1].id, x);
+  fire(); // all voted
+  assert.equal(room.phase, 'actoff-result');
+  assert.equal(room.players.get(x).score, 1500);
+  assert.equal(room.players.get(y).score, 500);
+  assert.equal(room.players.get(x).edge, true);
+  assert.equal(room.players.get(y).edge, false);
+  assert.ok(lastFor('host').players[0].score !== undefined, 'scores revealed after act-off');
+
+  room.advance();
+  assert.equal(room.phase, 'question');
+  assert.ok(room.question.edgeHolders.has(x));
+  assert.equal(lastFor('s-' + room.players.get(x).name).question.hasEdge, true);
+});
+
+test('edge holders get a crossed-out option on choice questions and cannot pick it', () => {
+  const { room, join } = makeRoom();
+  const [a] = join('A', 'B', 'C');
+  room.start();
+  // Force a choice question with the EDGE.
+  a.edge = true;
+  room.playlist[room.qIndex + 1] = 'rainbow';
+  room.nextQuestion();
+  const q = room.question;
+  assert.ok(q.edgeHolders.has(a.id));
+  assert.notEqual(q.removed, q.answer);
+  assert.equal(room.playerView(a).question.removed, q.removed);
+  assert.match(room.submitGuess(a.id, q.removed).error, /option/);
+});
+
+test('act-offs are skipped with fewer than 3 players; game ends with final', () => {
+  const { room, join } = makeRoom();
+  join('A', 'B');
+  room.configure({ perSet: 3, sets: 1 });
+  room.start();
+  for (let i = 0; i < 3; i++) { room.advance(); room.advance(); }
   assert.equal(room.phase, 'final');
 });
 
-test('timer runs out -> reveal even if not everyone guessed', () => {
-  const { room, fire } = makeRoom();
-  const a = room.join({ name: 'A', socketId: 'sa' }).player;
-  room.join({ name: 'B', socketId: 'sb' });
-  room.start(2);
-  fire();
-  room.submitGuess(a.id, 1);
-  fire();
-  assert.equal(room.phase, 'reveal');
+test('final act-off leads to the final screen and leaves no EDGE behind', () => {
+  const { room, join } = makeRoom();
+  join('A', 'B', 'C');
+  room.configure({ perSet: 3, sets: 1 });
+  room.start();
+  for (let i = 0; i < 3; i++) { room.advance(); room.advance(); }
+  assert.equal(room.phase, 'actoff');
+  room.advance();
+  room.advance(); // close voting with no votes → tie
+  assert.equal(room.phase, 'actoff-result');
+  assert.ok([...room.players.values()].every((p) => !p.edge));
+  room.advance();
+  assert.equal(room.phase, 'final');
+});
+
+test('rerolling actors picks different people when possible', () => {
+  const { room, join } = makeRoom();
+  join('A', 'B', 'C', 'D', 'E');
+  room.configure({ perSet: 3, sets: 1 });
+  room.start();
+  for (let i = 0; i < 3; i++) { room.advance(); room.advance(); }
+  const before = [...room.actoff.actors];
+  room.rerollActors();
+  assert.ok(room.actoff.actors.every((id) => !before.includes(id)));
 });
