@@ -2,19 +2,18 @@
   "name": "who-can-guess",
   "version": "1.0.0",
   "description": "A party game of quick mini guessing games. Everyone guesses; round winners earn a slight edge for the next round.",
-  "main": "src/server.js",
+  "main": "worker/index.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "node --watch src/server.js",
+    "start": "wrangler dev --ip 0.0.0.0",
+    "dev": "wrangler dev --ip 0.0.0.0",
+    "deploy": "wrangler deploy",
     "test": "node --test test/*.test.js"
-  },
-  "engines": {
-    "node": ">=18"
   },
   "license": "MIT",
   "dependencies": {
-    "express": "^5.1.0",
-    "qrcode": "^1.5.4",
-    "socket.io": "^4.8.1"
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "wrangler": "^4.162.0"
   }
 }

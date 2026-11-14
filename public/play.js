@@ -1,4 +1,4 @@
-const socket = io();
+const socket = createSocket();
 const app = document.getElementById('app');
 let state = null;
 let renderedKey = null;
@@ -13,16 +13,26 @@ function emit(event, payload = {}) {
 const params = new URLSearchParams(location.search);
 const saved = store.get('wcg-player'); // { code, playerId, name }
 
+// (Re)joining: whenever the socket (re)connects, take back our saved seat.
 socket.on('connect', async () => {
+  const seat = store.get('wcg-player');
+  if (!seat || seat.code !== socket.code || !seat.playerId) return;
+  const res = await emit('player:join', seat);
+  if (res.error) {
+    store.del('wcg-player');
+    state = null;
+    renderedKey = null;
+    joinError = res.error;
+    joinView();
+  }
+});
+
+(function start() {
   // A QR code for a different room wins over a saved seat.
   const urlCode = (params.get('code') || '').toUpperCase();
-  if (saved && saved.playerId && (!urlCode || urlCode === saved.code)) {
-    const res = await emit('player:join', saved);
-    if (!res.error) return;
-    store.del('wcg-player');
-  }
-  if (!state) joinView();
-});
+  if (saved && saved.playerId && (!urlCode || urlCode === saved.code)) socket.connect(saved.code);
+  else joinView();
+})();
 
 socket.on('state', (s) => {
   state = s;
@@ -46,7 +56,10 @@ function joinView() {
     onsubmit: async (e) => {
       e.preventDefault();
       btn.disabled = true;
-      const res = await emit('player:join', { code: code.value, name: name.value });
+      const c = code.value.trim().toUpperCase();
+      if (!/^[A-Z]{4}$/.test(c)) { err.textContent = 'Room codes are 4 letters.'; btn.disabled = false; return; }
+      await socket.connect(c);
+      const res = await emit('player:join', { code: c, name: name.value });
       btn.disabled = false;
       if (res.error) { err.textContent = res.error; return; }
       joinError = '';

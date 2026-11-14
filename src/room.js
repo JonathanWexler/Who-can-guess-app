@@ -1,4 +1,3 @@
-const crypto = require('node:crypto');
 const { BY_ID, pickQuestions } = require('./questions');
 const { ACT_PROMPTS } = require('./actprompts');
 const { isCorrect, scoreActOff, QUESTION_POINTS } = require('./scoring');
@@ -20,11 +19,11 @@ class Room {
    */
   constructor(code, deps) {
     this.code = code;
-    this.hostToken = crypto.randomUUID();
+    this.hostToken = globalThis.crypto.randomUUID();
     this.hostSocketId = null;
     this.emitTo = deps.emitTo;
     this.rng = deps.rng || Math.random;
-    this.timers = deps.timers || { setTimeout, clearTimeout };
+    this.timers = deps.timers || { setTimeout: (fn, ms) => setTimeout(fn, ms), clearTimeout: (t) => clearTimeout(t) };
     this.now = deps.now || Date.now;
     this.players = new Map();
     this.phase = 'lobby';
@@ -56,7 +55,7 @@ class Room {
     if ([...this.players.values()].some((p) => p.name.toLowerCase() === name.toLowerCase())) return { error: 'That name is taken in this room.' };
     const used = new Set([...this.players.values()].map((p) => p.color));
     const player = {
-      id: crypto.randomUUID(),
+      id: globalThis.crypto.randomUUID(),
       name,
       color: PLAYER_COLORS.find((c) => !used.has(c)) || PLAYER_COLORS[this.players.size % PLAYER_COLORS.length],
       score: 0,

@@ -1,4 +1,4 @@
-const socket = io();
+const socket = createSocket();
 const app = document.getElementById('app');
 let state = null;
 let current = { key: null, update: null };
@@ -16,15 +16,29 @@ fetch('/api/info').then((r) => r.json()).then((info) => {
   if (state) render();
 }).catch(() => {});
 
+// Reconnect to our saved room, or claim a fresh room code.
+let hostToken = null;
 socket.on('connect', async () => {
-  const saved = store.get('wcg-host');
-  if (saved) {
-    const res = await emit('host:resume', saved);
-    if (!res.error) return;
+  const res = hostToken ? await emit('host:resume', { code: socket.code, hostToken }) : await emit('host:create');
+  if (res.error) {
+    if (hostToken) { store.del('wcg-host'); location.reload(); }
+    else app.replaceChildren(h('p.center.error', res.error));
+    return;
   }
-  const res = await emit('host:create');
-  store.set('wcg-host', { code: res.code, hostToken: res.hostToken });
+  hostToken = res.hostToken;
+  store.set('wcg-host', { code: socket.code, hostToken });
 });
+
+(async function openRoom() {
+  const saved = store.get('wcg-host');
+  if (saved && saved.code && saved.hostToken) {
+    hostToken = saved.hostToken;
+    return socket.connect(saved.code);
+  }
+  const res = await fetch('/api/new-room', { method: 'POST' }).then((r) => r.json()).catch(() => ({ error: 'Could not reach the server.' }));
+  if (res.error) return app.replaceChildren(h('p.center.error', res.error));
+  socket.connect(res.code);
+})();
 
 socket.on('state', (s) => {
   state = s;
