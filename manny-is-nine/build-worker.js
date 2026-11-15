@@ -7,7 +7,7 @@ const dir = __dirname;
 const types = { '.jpg': 'image/jpeg', '.png': 'image/png', '.mp3': 'audio/mpeg' };
 const files = {};
 for (const f of fs.readdirSync(dir)) {
-  if (f === 'manny.jpg' || f === 'song.mp3' || /^(face\d*|maze)\.png$/.test(f)) {
+  if (f === 'manny.jpg' || f === 'finale.jpg' || f === 'song.mp3' || /^(face\d*|maze)\.png$/.test(f)) {
     files['/' + f] = [types[path.extname(f)], fs.readFileSync(path.join(dir, f)).toString('base64')];
   }
 }

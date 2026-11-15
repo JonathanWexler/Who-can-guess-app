@@ -4,6 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Manny Is Nine!</title>
+<meta name="description" content="9 games for Manny's 9th birthday. Win them all to spell out the secret message!">
+<!-- Link preview (iMessage, WhatsApp, Facebook, Slack, ...) -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://manny.jonwexler.com/">
+<meta property="og:title" content="Manny Is Nine! 🎂">
+<meta property="og:description" content="9 games for Manny's 9th birthday. Win them all to spell out the secret message!">
+<meta property="og:image" content="https://manny.jonwexler.com/finale.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="800">
+<meta property="og:image:alt" content="Manny at her 9th birthday party with a cake">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Manny Is Nine! 🎂">
+<meta name="twitter:image" content="https://manny.jonwexler.com/finale.jpg">
+<link rel="apple-touch-icon" href="face4.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -150,7 +164,7 @@
   .finale .msg { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 16px; margin: 10px 0 16px; }
   .finale .msg span { display: inline-block; font-size: clamp(2.4rem, 12vw, 4.4rem); font-weight: 700; color: var(--pink); text-shadow: 0 4px 0 #fff, 0 6px 0 rgba(0,0,0,.1); animation: hop 1s ease-in-out infinite; }
   @keyframes hop { 50% { transform: translateY(-12px); } }
-  .finale img { width: min(100%, 420px); border-radius: 22px; border: 8px solid #fff; box-shadow: 0 10px 30px rgba(0,0,0,.2); animation: pop .8s cubic-bezier(.3, 1.4, .5, 1); }
+  .finale img { width: min(100%, 560px); border-radius: 22px; border: 8px solid #fff; box-shadow: 0 10px 30px rgba(0,0,0,.2); animation: pop .8s cubic-bezier(.3, 1.4, .5, 1); }
   .hidden { display: none !important; }
 
   /* Manny's face, used all over the game */
@@ -452,7 +466,7 @@ function finale() {
   screen.replaceChildren(h('div.finale',
     h('div.msg', MESSAGE.split(' ').map((w, wi) => h('div', [...w].map((ch, i) => h('span', { style: { animationDelay: `${(wi * 4 + i) * 0.08}s` } }, ch))))),
     h('h2', { style: { margin: '0 0 12px' } }, 'Happy 9th Birthday, Manny! \u{1F382}\u{1F388}'),
-    h('img', { src: 'manny.jpg', alt: 'Manny' }),
+    h('img', { src: 'finale.jpg', alt: 'Manny at her 9th birthday party' }),
     h('p', { style: { fontSize: '1.15rem', margin: '16px 0' } }, 'You won all 9 games and spelled the secret message!'),
     h('p', h('button.big-btn', { onclick: () => { confetti(); sfx.win(); } }, 'More confetti! \u{1F38A}'), ' ', h('button.big-btn.alt', { onclick: () => { done = new Set(); save(); home(); } }, 'Play again')),
   ));
