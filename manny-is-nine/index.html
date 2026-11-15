@@ -108,6 +108,7 @@
   .lslot { width: 56px; height: 64px; border-radius: 14px; display: grid; place-items: center; font-size: 2rem; font-weight: 700; background: #efeaff; border: 3px dashed #cfc5f5; }
   .lslot.full { background: #fff; border: 3px solid var(--purple); }
   .hint { font-size: 3.4rem; text-align: center; }
+  .hint .face { width: 90px; height: 90px; }
 
   /* math */
   .sum { font-size: clamp(2.4rem, 11vw, 3.6rem); font-weight: 700; text-align: center; margin: 18px 0 8px; }
@@ -147,12 +148,31 @@
   @keyframes hop { 50% { transform: translateY(-12px); } }
   .finale img { width: min(100%, 420px); border-radius: 22px; border: 8px solid #fff; box-shadow: 0 10px 30px rgba(0,0,0,.2); animation: pop .8s cubic-bezier(.3, 1.4, .5, 1); }
   .hidden { display: none !important; }
+
+  /* Manny's face, used all over the game */
+  .face { display: inline-block; border-radius: 50%; object-fit: cover; vertical-align: middle; pointer-events: none; }
+  .face.ring { box-shadow: 0 0 0 4px #fff, 0 4px 10px rgba(0,0,0,.18); }
+  .top h1 .face { width: 38px; height: 38px; margin-right: 4px; }
+  .hello .face { width: 120px; height: 120px; animation: hop 1.2s ease-in-out infinite; }
+  .cheer { position: absolute; left: 50%; bottom: 8px; width: 78px; height: 78px; transform: translateX(-50%); z-index: 2; }
+  .simon-wrap { position: relative; }
+  .simon-face { position: absolute; left: 50%; top: 50%; width: 30%; height: auto; aspect-ratio: 1; transform: translate(-50%, -50%); z-index: 3; }
+  .cell .face { width: 86%; height: 86%; }
+  .mcard .f .face { width: 82%; height: auto; aspect-ratio: 1; }
+  .catcher { position: absolute; bottom: 4px; width: 110px; transform: translateX(-50%); pointer-events: none; text-align: center; line-height: .8; }
+  .catcher .face { width: 70px; height: 70px; }
+  .catcher .bk { font-size: 3.2rem; display: block; margin-top: -12px; }
+  .bubble.manny { background: url(face.png) center / cover; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,.7); font-size: 2.2rem; }
+  .reward .face { width: 96px; height: 96px; margin-top: -60px; animation: hop 1s ease-in-out infinite; }
+  .math-face { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 10px; }
+  .math-face .face { width: 64px; height: 64px; }
+  .bubble-say { background: #fff; border-radius: 16px; padding: 6px 12px; font-weight: 700; box-shadow: 0 3px 0 rgba(0,0,0,.1); }
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="top">
-    <h1>🎂 Manny Is Nine!</h1>
+    <h1><img class="face ring" src="face.png" alt=""> Manny Is Nine!</h1>
     <button class="icon-btn" id="sound" title="Sound on/off">🔊</button>
   </div>
   <div class="board" id="board"></div>
@@ -172,7 +192,7 @@ const LEVELS = [
   { name: 'Pop the M’s', emoji: '\u{1F388}', play: balloonLevel },
   { name: 'Memory Match', emoji: '\u{1F0CF}', play: memoryLevel },
   { name: 'Copy the Colors', emoji: '\u{1F3B5}', play: simonLevel },
-  { name: 'Puppy Maze', emoji: '\u{1F436}', play: mazeLevel },
+  { name: 'Manny\u2019s Maze', emoji: '\u{1F9ED}', play: mazeLevel },
   { name: 'Word Scramble', emoji: '\u{1F524}', play: wordLevel },
   { name: 'Birthday Math', emoji: '➕', play: mathLevel },
   { name: 'Catch the Treats', emoji: '\u{1F9FA}', play: catchLevel },
@@ -207,6 +227,10 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
 function wiggle(el) { el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
+
+// Manny's face (face.png is a round cut-out made by make-face.py).
+const face = (cls = '') => h('img.face' + (cls ? '.' + cls.split(' ').join('.') : ''), { src: 'face.png', alt: 'Manny', draggable: 'false' });
+function bounce(el) { el.animate([{ scale: 1 }, { scale: 1.25 }, { scale: 1 }], 350); }
 
 // ---- sound (little synth beeps, no files needed) -----------------------------
 let muted = store.get('manny9-muted', false);
@@ -267,6 +291,7 @@ function home() {
   const next = LEVELS.findIndex((_, i) => !done.has(i));
   fill(screen,
     h('div.hello',
+      face('ring'),
       h('h2', done.size ? 'Keep going, Manny! \u{1F31F}' : 'Happy Birthday, Manny! \u{1F389}'),
       h('p', done.size ? `${done.size} of 9 games done. Can you finish the secret message?` : 'Win the 9 games to spell out the secret message!'),
     ),
@@ -328,6 +353,7 @@ function levelWon(i) {
   const letters = LEVEL_LETTERS[i].map((k) => MESSAGE[k]);
   const last = done.size === LEVELS.length;
   const ov = h('div.overlay', h('div.reward',
+    face('ring'),
     h('h2', { style: { margin: 0 } }, pick(['Amazing!', 'You did it!', 'Super job!', 'Awesome!', 'Woo-hoo!']) + ' \u{1F389}'),
     h('p', { style: { margin: '6px 0 0', fontSize: '1.1rem' } }, letters.length > 1 ? 'You earned the letters' : 'You earned the letter'),
     h('div', letters.map((l) => h('span.bigl', l))),
@@ -388,6 +414,8 @@ function balloonLevel(area, api) {
   api.progress(0, need);
   Object.assign(area.style, { height: '62vh', background: 'linear-gradient(#bfe6ff, #eaf7ff)' });
   const colors = ['#ff5d9e', '#4d8dff', '#3cc977', '#9b5de5', '#ff9a3c', '#f5c400'];
+  const cheer = face('ring cheer');
+  area.append(cheer);
   let sinceM = 0;
   const spawn = () => {
     // Make sure an M comes along at least every 3 balloons.
@@ -410,6 +438,7 @@ function balloonLevel(area, api) {
       boom.animate([{ transform: 'translate(-50%,-50%) scale(.5)', opacity: 1 }, { transform: 'translate(-50%,-50%) scale(1.6)', opacity: 0 }], 400).onfinish = () => boom.remove();
       b.remove();
       sfx.pop();
+      bounce(cheer);
       got += 1;
       api.progress(got, need);
       if (got >= need) api.after(500, api.win);
@@ -421,7 +450,8 @@ function balloonLevel(area, api) {
 
 // 2. Memory Match — flip cards to find pairs.
 function memoryLevel(area, api) {
-  const faces = shuffle(['\u{1F382}', '\u{1F388}', '\u{1F381}', '\u{1F9C1}', '\u{1F984}', '\u{1F436}']);
+  const faceImg = () => h('img.face', { src: 'face.png', alt: 'Manny', draggable: 'false' });
+  const faces = shuffle(['\u{1F382}', '\u{1F388}', '\u{1F381}', '\u{1F9C1}', '\u{1F984}', 'MANNY']);
   const deck = shuffle([...faces, ...faces]);
   let open = [];
   let pairs = 0;
@@ -430,7 +460,7 @@ function memoryLevel(area, api) {
   api.progress(0, 6);
   const grid = h('div.cards');
   deck.forEach((face) => {
-    const card = h('button.mcard', h('div.in', h('div.k', '?'), h('div.f', face)));
+    const card = h('button.mcard', h('div.in', h('div.k', '?'), h('div.f', face === 'MANNY' ? faceImg() : face)));
     card.onclick = () => {
       if (busy || card.classList.contains('up') || card.classList.contains('got')) return;
       card.classList.add('up');
@@ -470,7 +500,8 @@ function simonLevel(area, api) {
   let listening = false;
   const pads = PADS.map((p, i) => h('button.pad', { style: { background: p.color }, onclick: () => press(i) }, p.emoji));
   const status = h('p.center', { style: { fontSize: '1.2rem', fontWeight: 600, margin: '4px 0 14px' } });
-  area.append(h('div.pads', pads), status);
+  const mid = face('ring simon-face');
+  area.append(h('div.simon-wrap', h('div.pads', pads), mid), status);
   api.goal(`Watch the fruits light up, then tap them in the same order. Get to ${target} in a row!`);
   api.progress(0, target);
   const flash = (i, ms = 420) => {
@@ -492,7 +523,7 @@ function simonLevel(area, api) {
       listening = false;
       sfx.bad();
       status.textContent = 'Oops! Watch again \u{1F648}';
-      wiggle(area);
+      wiggle(mid);
       api.after(900, play);
       return;
     }
@@ -502,6 +533,7 @@ function simonLevel(area, api) {
       api.progress(seq.length, target);
       if (seq.length >= target) { status.textContent = 'Perfect! \u{1F31F}'; api.after(700, api.win); return; }
       status.textContent = 'Yes! \u{1F389}';
+      bounce(mid);
       seq.push(randi(0, 3));
       api.after(700, play);
     }
@@ -509,7 +541,7 @@ function simonLevel(area, api) {
   play();
 }
 
-// 4. Puppy Maze — guide the puppy to the cake.
+// 4. Manny's Maze — guide Manny to the cake.
 function mazeLevel(area, api) {
   const W = 7;
   const H = 8;
@@ -537,10 +569,10 @@ function mazeLevel(area, api) {
   const grid = h('div.maze', { style: { gridTemplateColumns: `repeat(${W}, 1fr)`, width: `min(100%, 400px, calc((100vh - 430px) * ${W / H}))` } });
   const els = cells.map((c) => h('div.cell', { class: ['t', 'r', 'b', 'l'].filter((k) => c[k]).join(' ') }));
   els.forEach((e) => grid.append(e));
+  const me = face();
   const paint = () => {
-    els.forEach((e, i) => { if (e.textContent && i !== goalY * W + goalX) e.textContent = ''; });
     els[goalY * W + goalX].textContent = '\u{1F382}';
-    els[py * W + px].textContent = '\u{1F436}';
+    els[py * W + px].replaceChildren(me);
     els[py * W + px].classList.add('trail');
   };
   const move = (dx, dy, wall) => {
@@ -549,7 +581,7 @@ function mazeLevel(area, api) {
     tone(520 + (px + py) * 20, 60, 'triangle', 0.08);
     paint();
     api.progress(px + py, goalX + goalY);
-    if (px === goalX && py === goalY) { els[py * W + px].textContent = '\u{1F973}'; api.after(500, api.win); }
+    if (px === goalX && py === goalY) { bounce(me); api.after(600, api.win); }
   };
   const dirs = { up: [0, -1, 't'], right: [1, 0, 'r'], down: [0, 1, 'b'], left: [-1, 0, 'l'] };
   const btn = (d, label, col, row) => h('button', { style: { gridColumn: col, gridRow: row }, onclick: () => move(...dirs[d]) }, label);
@@ -572,14 +604,14 @@ function mazeLevel(area, api) {
   addEventListener('keydown', onKey);
   const stop = stopLevel;
   stopLevel = () => { removeEventListener('keydown', onKey); stop(); };
-  api.goal('Help the puppy get to the birthday cake! Use the arrows or swipe.');
+  api.goal('Help Manny get to her birthday cake! Use the arrows or swipe.');
   api.progress(0, 1);
   paint();
 }
 
 // 5. Word Scramble — tap the letters in the right order.
 function wordLevel(area, api) {
-  const words = [['CAKE', '\u{1F382}'], ['PARTY', '\u{1F973}'], ['MANNY', '\u{1F31F}']];
+  const words = [['CAKE', '\u{1F382}'], ['PARTY', '\u{1F973}'], ['MANNY', 'FACE']];
   let w = 0;
   api.goal('Tap the letters in the right order to spell the birthday word!');
   const show = () => {
@@ -610,7 +642,7 @@ function wordLevel(area, api) {
     const slotRow = h('div.slots', slots);
     const undo = h('button.big-btn.alt', { style: { fontSize: '1rem', padding: '8px 18px' }, onclick: () => { const last = typed.pop(); if (last) { tiles[last.k].disabled = false; paint(); } } }, '↩️ Undo');
     area.replaceChildren(h('div', { style: { padding: '16px' } },
-      h('div.hint', hint),
+      h('div.hint', hint === 'FACE' ? face('ring') : hint),
       h('p.center', { style: { margin: '4px 0', color: 'var(--muted)' } }, w === words.length - 1 ? 'Last one: whose birthday is it? \u{1F609}' : `Word ${w + 1} of ${words.length}`),
       slotRow, h('div.tiles', tiles), h('p.center', undo)));
   };
@@ -643,7 +675,7 @@ function mathLevel(area, api) {
     }, v));
     fill(area,
       h('div.sum', `${t} ${a} ${op} ${b} = ?`),
-      n === need - 1 ? h('p.center', { style: { margin: 0, color: 'var(--muted)' } }, 'Hint: it’s a very special number today! \u{1F382}') : null,
+      n === need - 1 ? h('div.math-face', face('ring'), h('span.bubble-say', 'How old am I today? \u{1F382}')) : null,
       h('div.answers', buttons),
     );
   };
@@ -655,10 +687,10 @@ function catchLevel(area, api) {
   const need = 9;
   let got = 0;
   let bx = 50; // basket x in %
-  api.goal(`Catch ${need} treats in the basket! Watch out for broccoli \u{1F966}`);
+  api.goal(`Help Manny catch ${need} treats! Watch out for broccoli \u{1F966}`);
   api.progress(0, need);
   Object.assign(area.style, { height: '60vh', background: 'linear-gradient(#fff3d6, #ffe0f0)' });
-  const basket = h('div.basket', '\u{1F9FA}');
+  const basket = h('div.catcher', face('ring'), h('span.bk', '\u{1F9FA}'));
   area.append(basket);
   const place = () => (basket.style.left = bx + '%');
   place();
@@ -696,10 +728,10 @@ function catchLevel(area, api) {
       const it = items[i];
       it.y += (it.v * dt) / 1000;
       it.el.style.top = it.y + '%';
-      if (it.y >= 84 && it.y <= 92 && Math.abs(it.x - bx) < 11) {
+      if (it.y >= 76 && it.y <= 90 && Math.abs(it.x - bx) < 12) {
         it.el.remove(); items.splice(i, 1);
         if (it.bad) { sfx.bad(); got = Math.max(0, got - 1); pop('\u{1F966} oops!', bx, '#2f8a3a'); }
-        else { sfx.good(); got += 1; pop('+1', bx, '#ff5d9e'); }
+        else { sfx.good(); got += 1; pop('+1', bx, '#ff5d9e'); bounce(basket.firstChild); }
         api.progress(got, need);
         if (got >= need) { api.win(); return; }
       } else if (it.y > 105) { it.el.remove(); items.splice(i, 1); }
@@ -719,7 +751,7 @@ function bubbleLevel(area, api) {
     const spots = shuffle([...Array(9).keys()]).map((c) => ({ x: 18 + (c % 3) * 32 + rand(-7, 7), y: 22 + Math.floor(c / 3) * 28 + rand(-6, 6) }));
     for (let n = 1; n <= 9; n++) {
       const { x, y } = spots[n - 1];
-      const b = h('button.bubble', { style: { left: x + '%', top: y + '%' } }, n);
+      const b = h('button.bubble', { class: n === 9 ? 'manny' : '', style: { left: x + '%', top: y + '%' } }, n);
       if (round === 2) b.animate([{ transform: 'translate(-50%,-50%)' }, { transform: `translate(calc(-50% + ${rand(-40, 40)}px), calc(-50% + ${rand(-30, 30)}px))` }], { duration: rand(1800, 2800), iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' });
       b.addEventListener('pointerdown', (e) => {
         e.preventDefault();
