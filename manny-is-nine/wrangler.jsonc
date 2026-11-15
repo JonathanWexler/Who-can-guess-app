@@ -1,0 +1,11 @@
+{
+  // Deploys the Manny Is Nine game as a Worker at manny.jonwexler.com.
+  // A custom domain makes Cloudflare create the DNS record + certificate.
+  "name": "manny",
+  "account_id": "ca137ae942b964de04a24d0b41bfe52f",
+  "main": "dist/_worker.js",
+  "compatibility_date": "2025-10-01",
+  "build": { "command": "node build-worker.js" },
+  "routes": [{ "pattern": "manny.jonwexler.com", "custom_domain": true }],
+  "workers_dev": false
+}

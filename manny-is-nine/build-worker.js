@@ -1,5 +1,5 @@
-// Packs index.html + manny.jpg + face.png into dist/_worker.js for a Cloudflare Pages
-// deploy (one self-contained script, no separate asset upload needed).
+// Packs index.html + manny.jpg + face.png into dist/_worker.js: one self-contained
+// script, deployed with `npx wrangler deploy` from this folder (see wrangler.jsonc).
 const fs = require('node:fs');
 const path = require('node:path');
 const dir = __dirname;
