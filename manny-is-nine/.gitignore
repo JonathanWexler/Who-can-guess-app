@@ -1,5 +1,5 @@
 dist/
-# Family photos stay out of the public repo.
-manny.jpg
-face.png
 .wrangler/
+# Family photos stay out of the public repo.
+*.jpg
+*.png

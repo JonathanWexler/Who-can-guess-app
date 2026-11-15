@@ -162,7 +162,11 @@
   .catcher { position: absolute; bottom: 4px; width: 110px; transform: translateX(-50%); pointer-events: none; text-align: center; line-height: .8; }
   .catcher .face { width: 70px; height: 70px; }
   .catcher .bk { font-size: 3.2rem; display: block; margin-top: -12px; }
-  .bubble.manny { background: url(face.png) center / cover; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,.7); font-size: 2.2rem; }
+  .bubble.manny { background: url(face2.png) center / cover; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,.7); font-size: 2.2rem; }
+  .strip { display: flex; justify-content: center; gap: 6px; margin: 4px 0 2px; }
+  .strip .face { width: 46px; height: 46px; animation: hop 1.6s ease-in-out infinite; }
+  .strip .face:nth-child(2n) { animation-delay: .4s; }
+  .strip .face:nth-child(3n) { animation-delay: .8s; }
   .reward .face { width: 96px; height: 96px; margin-top: -60px; animation: hop 1s ease-in-out infinite; }
   .math-face { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 10px; }
   .math-face .face { width: 64px; height: 64px; }
@@ -172,7 +176,7 @@
 <body>
 <div class="wrap">
   <div class="top">
-    <h1><img class="face ring" src="face.png" alt=""> Manny Is Nine!</h1>
+    <h1><img class="face ring" src="face4.png" alt=""> Manny Is Nine!</h1>
     <button class="icon-btn" id="sound" title="Sound on/off">🔊</button>
   </div>
   <div class="board" id="board"></div>
@@ -228,8 +232,11 @@ const store = {
 };
 function wiggle(el) { el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
 
-// Manny's face (face.png is a round cut-out made by make-face.py).
-const face = (cls = '') => h('img.face' + (cls ? '.' + cls.split(' ').join('.') : ''), { src: 'face.png', alt: 'Manny', draggable: 'false' });
+// Manny's faces: round cut-outs of different photos (face.png is from the
+// painted photo; face1-5.png from the other photos; maze.png for the maze).
+const MAZE_FACE = 'face5.png'; // swap for the magnifying-glass photo when it arrives
+const FACES = ['face.png', 'face1.png', 'face2.png', 'face3.png', 'face4.png', 'face5.png'];
+const face = (cls = '', src = 'face4.png') => h('img.face' + (cls ? '.' + cls.split(' ').join('.') : ''), { src, alt: 'Manny', draggable: 'false' });
 function bounce(el) { el.animate([{ scale: 1 }, { scale: 1.25 }, { scale: 1 }], 350); }
 
 // ---- sound (little synth beeps, no files needed) -----------------------------
@@ -291,10 +298,11 @@ function home() {
   const next = LEVELS.findIndex((_, i) => !done.has(i));
   fill(screen,
     h('div.hello',
-      face('ring'),
+      face('ring', 'face1.png'),
       h('h2', done.size ? 'Keep going, Manny! \u{1F31F}' : 'Happy Birthday, Manny! \u{1F389}'),
       h('p', done.size ? `${done.size} of 9 games done. Can you finish the secret message?` : 'Win the 9 games to spell out the secret message!'),
     ),
+    h('div.strip', FACES.map((src, k) => face('ring', src))),
     h('div.levels', LEVELS.map((lv, i) => {
       const isDone = done.has(i);
       const locked = !isDone && i !== next;
@@ -353,7 +361,7 @@ function levelWon(i) {
   const letters = LEVEL_LETTERS[i].map((k) => MESSAGE[k]);
   const last = done.size === LEVELS.length;
   const ov = h('div.overlay', h('div.reward',
-    face('ring'),
+    face('ring', pick(FACES)),
     h('h2', { style: { margin: 0 } }, pick(['Amazing!', 'You did it!', 'Super job!', 'Awesome!', 'Woo-hoo!']) + ' \u{1F389}'),
     h('p', { style: { margin: '6px 0 0', fontSize: '1.1rem' } }, letters.length > 1 ? 'You earned the letters' : 'You earned the letter'),
     h('div', letters.map((l) => h('span.bigl', l))),
@@ -414,7 +422,7 @@ function balloonLevel(area, api) {
   api.progress(0, need);
   Object.assign(area.style, { height: '62vh', background: 'linear-gradient(#bfe6ff, #eaf7ff)' });
   const colors = ['#ff5d9e', '#4d8dff', '#3cc977', '#9b5de5', '#ff9a3c', '#f5c400'];
-  const cheer = face('ring cheer');
+  const cheer = face('ring cheer', 'face3.png');
   area.append(cheer);
   let sinceM = 0;
   const spawn = () => {
@@ -450,8 +458,9 @@ function balloonLevel(area, api) {
 
 // 2. Memory Match — flip cards to find pairs.
 function memoryLevel(area, api) {
-  const faceImg = () => h('img.face', { src: 'face.png', alt: 'Manny', draggable: 'false' });
-  const faces = shuffle(['\u{1F382}', '\u{1F388}', '\u{1F381}', '\u{1F9C1}', '\u{1F984}', 'MANNY']);
+  // Three of the pairs are different photos of Manny: can she tell herself apart?
+  const faceImg = (src) => h('img.face', { src, alt: 'Manny', draggable: 'false' });
+  const faces = shuffle(['\u{1F382}', '\u{1F388}', '\u{1F381}', 'face2.png', 'face3.png', 'face5.png']);
   const deck = shuffle([...faces, ...faces]);
   let open = [];
   let pairs = 0;
@@ -460,7 +469,7 @@ function memoryLevel(area, api) {
   api.progress(0, 6);
   const grid = h('div.cards');
   deck.forEach((face) => {
-    const card = h('button.mcard', h('div.in', h('div.k', '?'), h('div.f', face === 'MANNY' ? faceImg() : face)));
+    const card = h('button.mcard', h('div.in', h('div.k', '?'), h('div.f', face.endsWith('.png') ? faceImg(face) : face)));
     card.onclick = () => {
       if (busy || card.classList.contains('up') || card.classList.contains('got')) return;
       card.classList.add('up');
@@ -500,7 +509,7 @@ function simonLevel(area, api) {
   let listening = false;
   const pads = PADS.map((p, i) => h('button.pad', { style: { background: p.color }, onclick: () => press(i) }, p.emoji));
   const status = h('p.center', { style: { fontSize: '1.2rem', fontWeight: 600, margin: '4px 0 14px' } });
-  const mid = face('ring simon-face');
+  const mid = face('ring simon-face', 'face4.png');
   area.append(h('div.simon-wrap', h('div.pads', pads), mid), status);
   api.goal(`Watch the fruits light up, then tap them in the same order. Get to ${target} in a row!`);
   api.progress(0, target);
@@ -569,7 +578,7 @@ function mazeLevel(area, api) {
   const grid = h('div.maze', { style: { gridTemplateColumns: `repeat(${W}, 1fr)`, width: `min(100%, 400px, calc((100vh - 430px) * ${W / H}))` } });
   const els = cells.map((c) => h('div.cell', { class: ['t', 'r', 'b', 'l'].filter((k) => c[k]).join(' ') }));
   els.forEach((e) => grid.append(e));
-  const me = face();
+  const me = face('', MAZE_FACE);
   const paint = () => {
     els[goalY * W + goalX].textContent = '\u{1F382}';
     els[py * W + px].replaceChildren(me);
@@ -642,7 +651,7 @@ function wordLevel(area, api) {
     const slotRow = h('div.slots', slots);
     const undo = h('button.big-btn.alt', { style: { fontSize: '1rem', padding: '8px 18px' }, onclick: () => { const last = typed.pop(); if (last) { tiles[last.k].disabled = false; paint(); } } }, '↩️ Undo');
     area.replaceChildren(h('div', { style: { padding: '16px' } },
-      h('div.hint', hint === 'FACE' ? face('ring') : hint),
+      h('div.hint', hint === 'FACE' ? face('ring', 'face2.png') : hint),
       h('p.center', { style: { margin: '4px 0', color: 'var(--muted)' } }, w === words.length - 1 ? 'Last one: whose birthday is it? \u{1F609}' : `Word ${w + 1} of ${words.length}`),
       slotRow, h('div.tiles', tiles), h('p.center', undo)));
   };
@@ -675,7 +684,7 @@ function mathLevel(area, api) {
     }, v));
     fill(area,
       h('div.sum', `${t} ${a} ${op} ${b} = ?`),
-      n === need - 1 ? h('div.math-face', face('ring'), h('span.bubble-say', 'How old am I today? \u{1F382}')) : null,
+      n === need - 1 ? h('div.math-face', face('ring', 'face.png'), h('span.bubble-say', 'How old am I today? \u{1F382}')) : null,
       h('div.answers', buttons),
     );
   };
@@ -690,7 +699,8 @@ function catchLevel(area, api) {
   api.goal(`Help Manny catch ${need} treats! Watch out for broccoli \u{1F966}`);
   api.progress(0, need);
   Object.assign(area.style, { height: '60vh', background: 'linear-gradient(#fff3d6, #ffe0f0)' });
-  const basket = h('div.catcher', face('ring'), h('span.bk', '\u{1F9FA}'));
+  // The open-mouth photo: Manny catching treats!
+  const basket = h('div.catcher', face('ring', 'face1.png'), h('span.bk', '\u{1F9FA}'));
   area.append(basket);
   const place = () => (basket.style.left = bx + '%');
   place();
