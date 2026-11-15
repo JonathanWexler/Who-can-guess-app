@@ -237,6 +237,29 @@ function wiggle(el) { el.classList.remove('shake'); void el.offsetWidth; el.clas
 const MAZE_FACE = 'face5.png'; // swap for the magnifying-glass photo when it arrives
 const FACES = ['face.png', 'face1.png', 'face2.png', 'face3.png', 'face4.png', 'face5.png'];
 const face = (cls = '', src = 'face4.png') => h('img.face' + (cls ? '.' + cls.split(' ').join('.') : ''), { src, alt: 'Manny', draggable: 'false' });
+// Something was answered right: every Manny face on screen (except the
+// memory-match cards, which are part of the puzzle) switches to the
+// open-mouth photo for a second with a little bounce, then switches back.
+const HAPPY_FACE = 'face1.png';
+function cheer() {
+  document.querySelectorAll('img.face').forEach((img) => {
+    if (img.closest('.mcard')) return;
+    if (!img.dataset.src) img.dataset.src = img.getAttribute('src');
+    img.src = HAPPY_FACE;
+    img.animate([{ scale: 1 }, { scale: 1.22 }, { scale: 0.95 }, { scale: 1 }], 450);
+    clearTimeout(img._cheerTimer);
+    img._cheerTimer = setTimeout(() => { img.src = img.dataset.src; delete img.dataset.src; }, 1000);
+  });
+  // Bubble 9 shows Manny as a background picture.
+  document.querySelectorAll('.bubble.manny').forEach((b) => {
+    b.style.backgroundImage = `url(${HAPPY_FACE})`;
+    clearTimeout(b._cheerTimer);
+    b._cheerTimer = setTimeout(() => (b.style.backgroundImage = ''), 1000);
+  });
+}
+// Preload it so the swap is instant.
+new Image().src = HAPPY_FACE;
+
 function bounce(el) { el.animate([{ scale: 1 }, { scale: 1.25 }, { scale: 1 }], 350); }
 
 // ---- sound (little synth beeps, no files needed) -----------------------------
@@ -422,8 +445,8 @@ function balloonLevel(area, api) {
   api.progress(0, need);
   Object.assign(area.style, { height: '62vh', background: 'linear-gradient(#bfe6ff, #eaf7ff)' });
   const colors = ['#ff5d9e', '#4d8dff', '#3cc977', '#9b5de5', '#ff9a3c', '#f5c400'];
-  const cheer = face('ring cheer', 'face3.png');
-  area.append(cheer);
+  const cheerFace = face('ring cheer', 'face3.png');
+  area.append(cheerFace);
   let sinceM = 0;
   const spawn = () => {
     // Make sure an M comes along at least every 3 balloons.
@@ -446,7 +469,7 @@ function balloonLevel(area, api) {
       boom.animate([{ transform: 'translate(-50%,-50%) scale(.5)', opacity: 1 }, { transform: 'translate(-50%,-50%) scale(1.6)', opacity: 0 }], 400).onfinish = () => boom.remove();
       b.remove();
       sfx.pop();
-      bounce(cheer);
+      cheer();
       got += 1;
       api.progress(got, need);
       if (got >= need) api.after(500, api.win);
@@ -482,6 +505,7 @@ function memoryLevel(area, api) {
         a.card.classList.add('got');
         b.card.classList.add('got');
         sfx.good();
+        cheer();
         pairs += 1;
         api.progress(pairs, 6);
         if (pairs === 6) api.after(600, api.win);
@@ -542,7 +566,7 @@ function simonLevel(area, api) {
       api.progress(seq.length, target);
       if (seq.length >= target) { status.textContent = 'Perfect! \u{1F31F}'; api.after(700, api.win); return; }
       status.textContent = 'Yes! \u{1F389}';
-      bounce(mid);
+      cheer();
       seq.push(randi(0, 3));
       api.after(700, play);
     }
@@ -590,7 +614,7 @@ function mazeLevel(area, api) {
     tone(520 + (px + py) * 20, 60, 'triangle', 0.08);
     paint();
     api.progress(px + py, goalX + goalY);
-    if (px === goalX && py === goalY) { bounce(me); api.after(600, api.win); }
+    if (px === goalX && py === goalY) { cheer(); api.after(1000, api.win); }
   };
   const dirs = { up: [0, -1, 't'], right: [1, 0, 'r'], down: [0, 1, 'b'], left: [-1, 0, 'l'] };
   const btn = (d, label, col, row) => h('button', { style: { gridColumn: col, gridRow: row }, onclick: () => move(...dirs[d]) }, label);
@@ -640,6 +664,7 @@ function wordLevel(area, api) {
       if (typed.length < word.length) return;
       if (typed.map((x) => x.ch).join('') === word) {
         sfx.good();
+        cheer();
         w += 1;
         api.after(500, () => (w >= words.length ? (api.progress(1, 1), api.win()) : show()));
       } else {
@@ -678,6 +703,7 @@ function mathLevel(area, api) {
         if (v !== ans) { sfx.bad(); wiggle(e.currentTarget); return; }
         e.currentTarget.classList.add('right');
         sfx.good();
+        cheer();
         n += 1;
         api.after(450, () => (n >= need ? (api.progress(1, 1), api.win()) : ask()));
       },
@@ -741,7 +767,7 @@ function catchLevel(area, api) {
       if (it.y >= 76 && it.y <= 90 && Math.abs(it.x - bx) < 12) {
         it.el.remove(); items.splice(i, 1);
         if (it.bad) { sfx.bad(); got = Math.max(0, got - 1); pop('\u{1F966} oops!', bx, '#2f8a3a'); }
-        else { sfx.good(); got += 1; pop('+1', bx, '#ff5d9e'); bounce(basket.firstChild); }
+        else { sfx.good(); got += 1; pop('+1', bx, '#ff5d9e'); cheer(); }
         api.progress(got, need);
         if (got >= need) { api.win(); return; }
       } else if (it.y > 105) { it.el.remove(); items.splice(i, 1); }
@@ -767,6 +793,7 @@ function bubbleLevel(area, api) {
         e.preventDefault();
         if (n !== next) { sfx.bad(); wiggle(b); return; }
         tone(300 + n * 70, 110, 'triangle', 0.15);
+        cheer();
         b.getAnimations().forEach((a) => a.cancel());
         b.classList.add('gone');
         b.disabled = true;
@@ -811,7 +838,7 @@ function puzzleLevel(area, api) {
       [order[sel], order[pos]] = [order[pos], order[sel]];
       sel = null;
       const solved = paint();
-      if (order[pos] === pos) sfx.good(); else sfx.pop();
+      if (order[pos] === pos) { sfx.good(); cheer(); } else sfx.pop();
       if (solved) {
         grid.classList.add('solved');
         tiles.forEach((x) => (x.disabled = true));
