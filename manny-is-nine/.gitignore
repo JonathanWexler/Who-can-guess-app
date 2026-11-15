@@ -1,5 +1,6 @@
 dist/
 .wrangler/
-# Family photos stay out of the public repo.
+# Family photos and Manny's song stay out of the public repo.
 *.jpg
 *.png
+*.mp3

@@ -27,6 +27,10 @@
   /* ---- top bar + secret message ---- */
   .top { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
   .top h1 { margin: 0; font-size: 1.35rem; flex: 1; }
+  #music.off { position: relative; opacity: .55; }
+  #music.off::after { content: ''; position: absolute; left: 9px; right: 9px; top: 50%; height: 3px; background: #e2264d; transform: rotate(-35deg); border-radius: 2px; }
+  #music.playing { animation: hop 1.2s ease-in-out infinite; }
+  .music-hint { position: fixed; left: 16px; right: 16px; bottom: 16px; margin: 0 auto; max-width: 360px; z-index: 40; text-align: center; background: #fff; border-radius: 999px; padding: 10px 16px; font-weight: 600; box-shadow: 0 4px 14px rgba(0,0,0,.15); animation: hop 1.4s ease-in-out infinite; }
   .icon-btn { border: 0; background: #fff; border-radius: 999px; width: 44px; height: 44px; font-size: 1.3rem; box-shadow: 0 3px 0 rgba(0,0,0,.12); }
   .board { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; background: #fff; border-radius: var(--radius); padding: 12px 8px; box-shadow: 0 5px 0 rgba(0,0,0,.08); }
   .word { display: flex; gap: 5px; }
@@ -177,7 +181,8 @@
 <div class="wrap">
   <div class="top">
     <h1><img class="face ring" src="face4.png" alt=""> Manny Is Nine!</h1>
-    <button class="icon-btn" id="sound" title="Sound on/off">🔊</button>
+    <button class="icon-btn" id="music" title="Song on/off">🎵</button>
+    <button class="icon-btn" id="sound" title="Sound effects on/off">🔊</button>
   </div>
   <div class="board" id="board"></div>
   <main id="screen"></main>
@@ -292,6 +297,47 @@ const paintSound = () => (soundBtn.textContent = muted ? '\u{1F507}' : '\u{1F50A
 soundBtn.onclick = () => { muted = !muted; store.set('manny9-muted', muted); paintSound(); if (!muted) sfx.good(); };
 paintSound();
 
+// ---- Manny's song: plays in the background from the main page, loops ------------
+// Browsers only allow sound after the first tap, so if autoplay is blocked the
+// song starts on the first tap anywhere (unless it's been muted).
+const song = new Audio('song.mp3');
+song.loop = true;
+song.preload = 'auto';
+song.volume = 0.55;
+let songMuted = store.get('manny9-song-muted', false);
+let songHint = null;
+const musicBtn = document.getElementById('music');
+const paintMusic = () => {
+  musicBtn.classList.toggle('off', songMuted);
+  musicBtn.classList.toggle('playing', !songMuted && !song.paused);
+  musicBtn.title = songMuted ? 'Play the song' : 'Mute the song';
+};
+function hideSongHint() { if (songHint) { songHint.remove(); songHint = null; } }
+function playSong() {
+  if (songMuted) return;
+  song.play().then(() => { hideSongHint(); paintMusic(); }).catch(() => {
+    // Autoplay blocked: wait for the first tap, and say so.
+    if (!songHint) {
+      songHint = h('div.music-hint', '\u{1F3B5} Tap anywhere to play Manny\u2019s song!');
+      document.body.append(songHint);
+    }
+    paintMusic();
+  });
+}
+const startOnFirstTap = () => { if (!songMuted && song.paused) playSong(); };
+addEventListener('pointerdown', startOnFirstTap, { capture: true });
+addEventListener('keydown', startOnFirstTap, { capture: true });
+musicBtn.onclick = (e) => {
+  e.stopPropagation();
+  songMuted = !songMuted;
+  store.set('manny9-song-muted', songMuted);
+  if (songMuted) { song.pause(); hideSongHint(); } else playSong();
+  paintMusic();
+};
+song.addEventListener('play', paintMusic);
+song.addEventListener('pause', paintMusic);
+paintMusic();
+
 // ---- progress + secret message board -----------------------------------------
 let done = new Set(store.get('manny9-done', []));
 const save = () => store.set('manny9-done', [...done]);
@@ -314,6 +360,7 @@ const screen = document.getElementById('screen');
 let stopLevel = null; // cleanup for the running level
 
 function home() {
+  playSong();
   document.body.classList.remove('playing');
   if (stopLevel) { stopLevel(); stopLevel = null; }
   drawBoard();
