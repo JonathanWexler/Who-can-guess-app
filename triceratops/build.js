@@ -1,22 +1,14 @@
 // Builds the Triceratops landing page and packs it into dist/_worker.js.
-//   tri.svg               the silhouette (two paths: far brow horn, then the body)
-//   page.template.html    the page, with __FAR__ / __BODY__ placeholders
+//   logo.webp             the neon triceratops logo (on pure black)
+//   page.template.html    the page
+//   *.png icons           made from the logo by `node make-icons.js`
 //   og.png                link-preview image (made by `node make-og.js`)
 const fs = require('node:fs');
 const path = require('node:path');
 const dir = __dirname;
 
-const svg = fs.readFileSync(path.join(dir, 'tri.svg'), 'utf8');
-const [far, body] = [...svg.matchAll(/ d="([^"]+)"/g)].map((m) => m[1]);
-const html = fs.readFileSync(path.join(dir, 'page.template.html'), 'utf8').replace('__FAR__', far).replace('__BODY__', body);
+const html = fs.readFileSync(path.join(dir, 'page.template.html'), 'utf8');
 fs.writeFileSync(path.join(dir, 'index.html'), html);
-
-const favicon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="40 40 960 460"><rect x="40" y="40" width="960" height="460" rx="90" fill="#050507"/><path d="${far}" fill="#000" stroke="#ff2e88" stroke-width="16" stroke-linejoin="round"/><path d="${body}" fill="#000" stroke="#ff2e88" stroke-width="16" stroke-linejoin="round"/></svg>`;
-fs.writeFileSync(path.join(dir, 'favicon.svg'), favicon);
-
-// Square app icon (home screens, Android, search results). Rendered to PNGs by make-icons.js.
-const icon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" fill="#050507"/><radialGradient id="g" cx="50%" cy="55%" r="60%"><stop offset="0" stop-color="#ff2e88" stop-opacity=".28"/><stop offset="1" stop-color="#050507" stop-opacity="0"/></radialGradient><rect width="512" height="512" fill="url(#g)"/><g transform="translate(26 120) scale(.48)"><path d="${far}" fill="#000" stroke="#ff2e88" stroke-width="9" stroke-linejoin="round"/><path d="${body}" fill="#000" stroke="#ff2e88" stroke-width="9" stroke-linejoin="round"/></g></svg>`;
-fs.writeFileSync(path.join(dir, 'icon.svg'), icon);
 
 const SITE = 'https://clubtriceratops.com/';
 const today = new Date().toISOString().slice(0, 10);
@@ -24,28 +16,28 @@ const robots = `User-agent: *\nAllow: /\n\nSitemap: ${SITE}sitemap.xml\n`;
 const sitemap = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n  <url>\n    <loc>${SITE}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>1.0</priority>\n    <image:image><image:loc>${SITE}og.png</image:loc></image:image>\n  </url>\n</urlset>\n`;
 const manifest = JSON.stringify({
   name: 'Triceratops', short_name: 'Triceratops', description: 'An interactive night club experience. Coming soon.',
-  start_url: '/', scope: '/', display: 'standalone', orientation: 'any', background_color: '#050507', theme_color: '#050507',
+  start_url: '/', scope: '/', display: 'standalone', orientation: 'any', background_color: '#000000', theme_color: '#000000',
   icons: [
     { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
     { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
-    { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
-    { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml' },
+    { src: '/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
   ],
 }, null, 2);
 // Not-found page: same mood, no links, kept out of search results.
-const notFound = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Triceratops</title><meta name="robots" content="noindex"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><style>html,body{margin:0;height:100%;background:#050507;color:#c9c2d6;font-family:Syne,'Helvetica Neue',Arial,sans-serif}body{display:grid;place-items:center;text-align:center;background:radial-gradient(circle at 50% 55%,rgba(255,46,136,.18),transparent 60%),#050507}p{letter-spacing:.32em;text-transform:lowercase;font-size:clamp(.9rem,2.4vw,1.2rem)}b{color:#fff;font-weight:400;text-shadow:0 0 10px #ff2e88,0 0 24px #ff2e88}</style></head><body><p>nothing here. <b>yet.</b></p></body></html>`;
+const notFound = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Triceratops</title><meta name="robots" content="noindex"><link rel="icon" href="/favicon-32.png" type="image/png"><style>html,body{margin:0;height:100%;background:#000;color:#b9d0e2;font-family:Syne,'Helvetica Neue',Arial,sans-serif}body{display:grid;place-items:center;text-align:center}p{letter-spacing:.32em;text-transform:lowercase;font-size:clamp(.9rem,2.4vw,1.2rem)}b{color:#fff;font-weight:400;text-shadow:0 0 10px #3fb8ff,0 0 24px #3fb8ff}</style></head><body><p>nothing here. <b>yet.</b></p></body></html>`;
 
 const files = {
   '/': ['text/html; charset=utf-8', Buffer.from(html).toString('base64'), 'no-cache'],
-  '/favicon.svg': ['image/svg+xml', Buffer.from(favicon).toString('base64'), 'public, max-age=86400'],
+  '/logo.webp': ['image/webp', fs.readFileSync(path.join(dir, 'logo.webp')).toString('base64'), 'public, max-age=86400'],
 };
 const text = (type, s, cc = 'public, max-age=3600') => [type, Buffer.from(s).toString('base64'), cc];
 files['/robots.txt'] = text('text/plain; charset=utf-8', robots);
 files['/sitemap.xml'] = text('application/xml; charset=utf-8', sitemap);
 files['/site.webmanifest'] = text('application/manifest+json; charset=utf-8', manifest);
-files['/icon.svg'] = text('image/svg+xml', icon, 'public, max-age=86400');
 files['/404'] = text('text/html; charset=utf-8', notFound, 'no-cache');
-for (const png of ['favicon-32.png', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png']) {
+// Old favicon address still works for browsers that cached it.
+files['/favicon.ico'] = ['image/png', fs.readFileSync(path.join(dir, 'favicon-32.png')).toString('base64'), 'public, max-age=86400'];
+for (const png of ['favicon-32.png', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png']) {
   if (fs.existsSync(path.join(dir, png))) files['/' + png] = ['image/png', fs.readFileSync(path.join(dir, png)).toString('base64'), 'public, max-age=86400'];
 }
 if (fs.existsSync(path.join(dir, 'og.png'))) files['/og.png'] = ['image/png', fs.readFileSync(path.join(dir, 'og.png')).toString('base64'), 'public, max-age=86400'];

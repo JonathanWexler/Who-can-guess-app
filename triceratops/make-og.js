@@ -6,7 +6,7 @@ const { chromium } = require('playwright');
   const p = await b.newPage({ viewport: { width: 1200, height: 630 } });
   await p.goto(process.argv[2] || 'http://localhost:8101/index.html');
   await p.waitForTimeout(4500); // let the fade-ins finish
-  await p.addStyleTag({ content: '.grain{display:none} .tri{width:640px !important}' });
+  await p.addStyleTag({ content: '.logo{width:auto !important;height:400px !important} .logo-wrap,.logo{animation:none !important;filter:none !important} .tag,.soon{opacity:1 !important;animation:none !important}' });
   await p.waitForTimeout(300);
   await p.screenshot({ path: __dirname + '/og.png' });
   await b.close();
