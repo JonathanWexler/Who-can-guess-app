@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Triceratops</title>
+<meta name="description" content="you don't know what you don't tri">
+<meta name="theme-color" content="#050507">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://clubtriceratops.com/">
+<meta property="og:title" content="Triceratops">
+<meta property="og:description" content="you don't know what you don't tri">
+<meta property="og:image" content="https://clubtriceratops.com/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Triceratops">
+<meta name="twitter:description" content="you don't know what you don't tri">
+<meta name="twitter:image" content="https://clubtriceratops.com/og.png">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --void: #050507;
+    --neon: #ff2e88;
+    --violet: #7b2dff;
+    --teal: #19e3d0;
+    --ink: #c9c2d6;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--void); }
+  body {
+    min-height: 100svh;
+    color: var(--ink);
+    font-family: 'Syne', 'Helvetica Neue', Arial, sans-serif;
+    overflow: hidden;
+    display: grid;
+    place-items: center;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---- light through smoke ---- */
+  .haze { position: fixed; inset: -20%; filter: blur(70px); opacity: .55; pointer-events: none; }
+  .haze i { position: absolute; border-radius: 50%; mix-blend-mode: screen; }
+  .haze i:nth-child(1) { width: 52vmax; height: 52vmax; left: 8%; top: 18%; background: radial-gradient(circle, rgba(255, 46, 136, .55), transparent 65%); animation: drift1 26s ease-in-out infinite alternate; }
+  .haze i:nth-child(2) { width: 58vmax; height: 58vmax; right: 2%; top: 28%; background: radial-gradient(circle, rgba(123, 45, 255, .55), transparent 65%); animation: drift2 32s ease-in-out infinite alternate; }
+  .haze i:nth-child(3) { width: 40vmax; height: 40vmax; left: 38%; bottom: 0; background: radial-gradient(circle, rgba(25, 227, 208, .28), transparent 65%); animation: drift3 38s ease-in-out infinite alternate; }
+  @keyframes drift1 { to { transform: translate(14vw, -8vh) scale(1.15); } }
+  @keyframes drift2 { to { transform: translate(-16vw, 6vh) scale(.9); } }
+  @keyframes drift3 { to { transform: translate(-10vw, -14vh) scale(1.2); } }
+
+  /* a slow light sweeping the room from above */
+  .beam { position: fixed; left: 50%; top: -30vh; width: 160vmax; height: 160vmax; transform: translateX(-50%); pointer-events: none;
+    background: conic-gradient(from 180deg at 50% 0%, transparent 0deg, rgba(255, 255, 255, .05) 6deg, transparent 12deg, transparent 360deg);
+    animation: sweep 14s ease-in-out infinite alternate; transform-origin: 50% 0%; }
+  @keyframes sweep { from { transform: translateX(-50%) rotate(-28deg); } to { transform: translateX(-50%) rotate(28deg); } }
+
+  /* film grain + vignette */
+  .grain { position: fixed; inset: -50%; pointer-events: none; opacity: .09; mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    animation: grain 1.2s steps(6) infinite; }
+  @keyframes grain { 0% { transform: translate(0, 0); } 20% { transform: translate(-3%, 2%); } 40% { transform: translate(2%, -3%); } 60% { transform: translate(-2%, -1%); } 80% { transform: translate(3%, 3%); } 100% { transform: translate(0, 0); } }
+  .vignette { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 45%, transparent 35%, rgba(0, 0, 0, .85) 100%); }
+
+  /* ---- the silhouette ---- */
+  main { position: relative; z-index: 2; text-align: center; padding: 24px; width: 100%; }
+  .tri { width: min(82vw, 820px); height: auto; display: block; margin: 0 auto; overflow: visible; animation: arrive 2.4s ease-out both; }
+  .tri .body { fill: #000; stroke: var(--neon); stroke-width: 2.2; stroke-linejoin: round; filter: url(#glow); animation: pulse 1.9s ease-in-out infinite; }
+  .tri .eye { fill: var(--neon); animation: blink 7s infinite; }
+  @keyframes pulse { 0%, 100% { stroke-opacity: .5; } 12% { stroke-opacity: 1; } 40% { stroke-opacity: .62; } }
+  @keyframes blink { 0%, 46%, 50%, 100% { opacity: 1; } 48% { opacity: 0; } }
+  @keyframes arrive { from { opacity: 0; transform: translateY(14px) scale(.98); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
+
+  .tag { margin: clamp(26px, 6vh, 56px) 0 0; font-weight: 400; font-size: clamp(.95rem, 2.6vw, 1.35rem); letter-spacing: .32em; text-transform: lowercase; color: var(--ink); opacity: 0; animation: fadein 2s 1.4s ease-out forwards; text-shadow: 0 0 18px rgba(255, 46, 136, .35); }
+  .tag .nb { white-space: nowrap; }
+  @media (max-width: 560px) { .tag { letter-spacing: .24em; line-height: 1.9; } .tag .nb { display: block; } }
+  .tag em { font-style: normal; color: #fff; text-shadow: 0 0 10px var(--neon), 0 0 26px var(--neon); }
+  .soon { margin-top: 22px; display: inline-flex; align-items: center; gap: 10px; font-size: .68rem; letter-spacing: .5em; text-transform: uppercase; color: rgba(201, 194, 214, .55); opacity: 0; animation: fadein 2s 2.6s ease-out forwards; }
+  .soon i { width: 7px; height: 7px; border-radius: 50%; background: var(--neon); box-shadow: 0 0 10px var(--neon), 0 0 22px var(--neon); animation: live 1.9s ease-in-out infinite; }
+  @keyframes live { 0%, 100% { opacity: .25; } 12% { opacity: 1; } }
+  @keyframes fadein { to { opacity: 1; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+    .tag, .soon { opacity: 1; }
+  }
+</style>
+</head>
+<body>
+  <div class="haze" aria-hidden="true"><i></i><i></i><i></i></div>
+  <div class="beam" aria-hidden="true"></div>
+  <main>
+    <svg class="tri" viewBox="40 40 960 460" role="img" aria-label="The dark outline of a triceratops">
+      <defs>
+        <filter id="glow" x="-20%" y="-30%" width="140%" height="160%">
+          <feGaussianBlur stdDeviation="5" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <path class="body" d="__FAR__"/>
+      <path class="body" d="__BODY__"/>
+      <circle class="eye" cx="214" cy="252" r="3.5"/>
+    </svg>
+    <p class="tag">you don&rsquo;t know <span class="nb">what you don&rsquo;t <em>tri</em></span></p>
+    <div class="soon" aria-label="Coming soon"><i></i>soon</div>
+  </main>
+  <div class="grain" aria-hidden="true"></div>
+  <div class="vignette" aria-hidden="true"></div>
+</body>
+</html>

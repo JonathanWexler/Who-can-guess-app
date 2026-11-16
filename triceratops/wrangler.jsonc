@@ -1,0 +1,13 @@
+{
+  // Landing page for clubtriceratops.com (deploy: `npx wrangler deploy` from this folder).
+  "name": "triceratops",
+  "account_id": "ca137ae942b964de04a24d0b41bfe52f",
+  "main": "dist/_worker.js",
+  "compatibility_date": "2025-10-01",
+  "build": { "command": "node build.js" },
+  "routes": [
+    { "pattern": "clubtriceratops.com", "custom_domain": true },
+    { "pattern": "www.clubtriceratops.com", "custom_domain": true }
+  ],
+  "workers_dev": false
+}
